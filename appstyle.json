@@ -1,0 +1,85 @@
+{
+    "colors": {
+        "primary": "#4CAF50",
+        "secondary": "#FFC107",
+        "background": "#FFFFFF",
+        "surface": "#F7F7F7",
+        "textPrimary": "#212121",
+        "textSecondary": "#757575",
+        "border": "#E0E0E0",
+        "success": "#4CAF50",
+        "error": "#F44336",
+        "disabled": "#BDBDBD"
+    },
+    "typography": {
+        "fontFamily": "sans-serif",
+        "h1": {
+            "fontSize": 32,
+            "fontWeight": "bold",
+            "color": "#212121"
+        },
+        "h2": {
+            "fontSize": 24,
+            "fontWeight": "600",
+            "color": "#212121"
+        },
+        "body": {
+            "fontSize": 16,
+            "fontWeight": "400",
+            "color": "#212121"
+        },
+        "caption": {
+            "fontSize": 12,
+            "fontWeight": "400",
+            "color": "#757575"
+        }
+    },
+    "buttons": {
+        "shape": "rounded",
+        "borderRadius": 12,
+        "elevation": 0,
+        "padding": {
+            "vertical": 12,
+            "horizontal": 20
+        },
+        "textStyle": {
+            "fontSize": 16,
+            "fontWeight": "600",
+            "color": "#FFFFFF"
+        }
+    },
+    "inputs": {
+        "borderRadius": 10,
+        "borderWidth": 1,
+        "borderColor": "#E0E0E0",
+        "padding": 12,
+        "placeholderColor": "#BDBDBD",
+        "textColor": "#212121"
+    },
+    "icons": {
+        "style": "outlined",
+        "size": 24,
+        "color": "#212121",
+        "activeColor": "#4CAF50",
+        "inactiveColor": "#BDBDBD"
+    },
+    "cards": {
+        "backgroundColor": "#FFFFFF",
+        "borderRadius": 16,
+        "elevation": 2,
+        "padding": 16
+    },
+    "animations": {
+        "defaultDuration": 300,
+        "easing": "easeInOut"
+    },
+    "illustrations": {
+        "style": "flat-minimal",
+        "character": "cute-tomato",
+        "accentColors": [
+            "#4CAF50",
+            "#FFC107",
+            "#FF5722"
+        ]
+    }
+}
