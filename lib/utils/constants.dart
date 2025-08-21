@@ -1,20 +1,52 @@
 import 'package:flutter/material.dart';
 
+/// 앱 전역 상수 정의
 class AppConstants {
   static const String appName = 'Fomato';
   static const String appDescription = '토마토 농장형 뽀모도로 앱';
+  static const String appVersion = '1.0.0';
   
-  static const Duration defaultFocusTime = Duration(minutes: 25);
-  static const Duration defaultShortBreakTime = Duration(minutes: 5);
-  static const Duration defaultLongBreakTime = Duration(minutes: 15);
-  static const int defaultFocusRounds = 4;
+  // 타이머 기본값
+  static const int defaultFocusMinutes = 25;
+  static const int defaultShortBreakMinutes = 5;
+  static const int defaultLongBreakMinutes = 15;
+  static const int defaultRoundsUntilLongBreak = 4;
+  static const bool defaultAutoStartNext = true;
   
-  static const int tomatoPerFocusSession = 1;
+  // 비즈니스 규칙
+  static const int tomatoPerFocusSession = 1;  // 25분 집중 = 토마토 1개
+  static const int minutesPerTomato = 25;      // 토마토 1개 = 25분
   
-  static const String farmStorageKey = 'farms';
-  static const String settingsStorageKey = 'settings';
-  static const String statisticsStorageKey = 'statistics';
-  static const String selectedFarmStorageKey = 'selected_farm';
+  // 저장소 키
+  static const String farmsKey = 'farms';
+  static const String statisticsKey = 'statistics';
+  static const String selectedFarmIdKey = 'selected_farm_id';
+  static const String timerSettingsKey = 'timer_settings';
+  static const String soundEnabledKey = 'sound_enabled';
+  static const String vibrationEnabledKey = 'vibration_enabled';
+  static const String notificationEnabledKey = 'notification_enabled';
+  
+  // 농장 기본 색상 팔레트
+  static const List<String> farmColors = [
+    '#4CAF50', // 녹색
+    '#2196F3', // 파란색
+    '#FF9800', // 주황색
+    '#9C27B0', // 보라색
+    '#F44336', // 빨간색
+    '#009688', // 청록색
+    '#FF5722', // 깊은 주황색
+    '#607D8B', // 청회색
+  ];
+  
+  // 타이머 설정 범위
+  static const int minFocusMinutes = 15;
+  static const int maxFocusMinutes = 60;
+  static const int minBreakMinutes = 3;
+  static const int maxShortBreakMinutes = 15;
+  static const int minLongBreakMinutes = 10;
+  static const int maxLongBreakMinutes = 30;
+  static const int minRounds = 2;
+  static const int maxRounds = 8;
 }
 
 class AppColors {
