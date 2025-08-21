@@ -1,129 +1,88 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/timer_state.dart';
+import '../services/timer_service.dart';
+import '../utils/constants.dart';
 import 'farm_provider.dart';
 
 /// 타이머 상태 관리 클래스
 class TimerNotifier extends StateNotifier<TimerState> {
-  TimerNotifier(this.ref) : super(TimerState.initial());
+  TimerNotifier(this.ref) : super(TimerState.initial()) {
+    _initializeService();
+  }
   
   final Ref ref;
-  Timer? _timer;
+  TimerService? _timerService;
+  StreamSubscription<TimerState>? _stateSubscription;
+
+  /// 서비스 초기화
+  void _initializeService() {
+    final settings = ref.read(timerSettingsProvider);
+    _timerService = TimerService(
+      focusMinutes: settings.focusMinutes,
+      shortBreakMinutes: settings.shortBreakMinutes,
+      longBreakMinutes: settings.longBreakMinutes,
+      roundsUntilLongBreak: settings.roundsUntilLongBreak,
+    );
+
+    // 서비스 상태 변화 구독
+    _stateSubscription = _timerService!.stateStream.listen((newState) {
+      state = newState;
+      
+      // 타이머 완료 시 자동 전환 처리
+      if (newState.status == TimerStatus.completed) {
+        if (ref.read(timerSettingsProvider).autoStartNext) {
+          Future.delayed(const Duration(seconds: 1), () {
+            _timerService!.nextMode();
+            // 집중 모드 완료 시 토마토 수확
+            if (state.mode == TimerMode.focus) {
+              _harvestTomato();
+            }
+          });
+        }
+      }
+    });
+  }
 
   /// 타이머 시작
   void start() {
-    if (state.status == TimerStatus.running) return;
-
-    state = state.copyWith(
-      status: TimerStatus.running,
-      startTime: DateTime.now(),
-    );
-
-    _startTicking();
+    _timerService?.start();
   }
 
   /// 타이머 일시정지
   void pause() {
-    _timer?.cancel();
-    state = state.copyWith(status: TimerStatus.paused);
+    _timerService?.pause();
   }
 
-  /// 타이머 재시작
+  /// 타이머 재시작  
   void resume() {
-    if (state.status != TimerStatus.paused) return;
-    
-    state = state.copyWith(status: TimerStatus.running);
-    _startTicking();
+    _timerService?.resume();
   }
 
   /// 타이머 정지
   void stop() {
-    _timer?.cancel();
-    state = TimerState.initial().copyWith(
-      selectedFarmId: state.selectedFarmId,
-    );
+    _timerService?.stop();
   }
 
-  /// 타이머 리셋 (현재 모드 유지)
+  /// 타이머 리셋
   void reset() {
-    _timer?.cancel();
-    
-    final seconds = _getSecondsForMode(state.mode);
-    state = state.copyWith(
-      status: TimerStatus.initial,
-      remainingSeconds: seconds,
-      totalSeconds: seconds,
-      startTime: null,
-      endTime: null,
-    );
+    _timerService?.reset();
   }
 
   /// 농장 선택
   void selectFarm(String? farmId) {
-    state = state.copyWith(selectedFarmId: farmId);
+    _timerService?.selectFarm(farmId);
   }
 
   /// 다음 모드로 전환
   void nextMode() {
-    _timer?.cancel();
+    final previousMode = state.mode;
+    _timerService?.nextMode();
     
-    TimerMode nextMode;
-    int nextRound = state.currentRound;
-    
-    if (state.mode == TimerMode.focus) {
-      // 집중 완료 후
-      if (state.currentRound >= state.totalRounds) {
-        // 긴 휴식 후 라운드 리셋
-        nextMode = TimerMode.longBreak;
-        nextRound = 1;
-      } else {
-        // 짧은 휴식
-        nextMode = TimerMode.shortBreak;
-      }
-      
-      // 토마토 수확!
+    // 집중 모드 완료 시 토마토 수확
+    if (previousMode == TimerMode.focus) {
       _harvestTomato();
-    } else {
-      // 휴식 완료 후 집중 모드
-      nextMode = TimerMode.focus;
-      if (state.mode == TimerMode.shortBreak) {
-        nextRound = state.currentRound + 1;
-      }
     }
-    
-    final seconds = _getSecondsForMode(nextMode);
-    state = state.copyWith(
-      mode: nextMode,
-      status: TimerStatus.initial,
-      remainingSeconds: seconds,
-      totalSeconds: seconds,
-      currentRound: nextRound,
-      startTime: null,
-      endTime: null,
-    );
-  }
-
-  /// 매초 실행되는 타이머 로직
-  void _startTicking() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (state.remainingSeconds > 0) {
-        state = state.copyWith(
-          remainingSeconds: state.remainingSeconds - 1,
-        );
-      } else {
-        // 타이머 완료
-        timer.cancel();
-        state = state.copyWith(
-          status: TimerStatus.completed,
-          endTime: DateTime.now(),
-        );
-        
-        // 자동으로 다음 모드로 전환 (나중에 설정으로 제어)
-        Future.delayed(const Duration(seconds: 1), () {
-          nextMode();
-        });
-      }
-    });
   }
 
   /// 토마토 수확 처리
@@ -134,23 +93,20 @@ class TimerNotifier extends StateNotifier<TimerState> {
     }
   }
 
-  /// 모드별 시간 반환 (초)
-  int _getSecondsForMode(TimerMode mode) {
-    switch (mode) {
-      case TimerMode.focus:
-        return 25 * 60; // 25분
-      case TimerMode.shortBreak:
-        return 5 * 60;  // 5분
-      case TimerMode.longBreak:
-        return 15 * 60; // 15분
-      case TimerMode.stopped:
-        return 0;
-    }
+  /// 설정 업데이트
+  void updateSettings(TimerSettings newSettings) {
+    _timerService = _timerService?.updateSettings(
+      focusMinutes: newSettings.focusMinutes,
+      shortBreakMinutes: newSettings.shortBreakMinutes,
+      longBreakMinutes: newSettings.longBreakMinutes,
+      roundsUntilLongBreak: newSettings.roundsUntilLongBreak,
+    );
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _stateSubscription?.cancel();
+    _timerService?.dispose();
     super.dispose();
   }
 }
@@ -169,11 +125,11 @@ class TimerSettings {
   final bool autoStartNext;    // 다음 모드 자동 시작
 
   const TimerSettings({
-    this.focusMinutes = 25,
-    this.shortBreakMinutes = 5,
-    this.longBreakMinutes = 15,
-    this.roundsUntilLongBreak = 4,
-    this.autoStartNext = true,
+    this.focusMinutes = AppConstants.defaultFocusMinutes,
+    this.shortBreakMinutes = AppConstants.defaultShortBreakMinutes,
+    this.longBreakMinutes = AppConstants.defaultLongBreakMinutes,
+    this.roundsUntilLongBreak = AppConstants.defaultRoundsUntilLongBreak,
+    this.autoStartNext = AppConstants.defaultAutoStartNext,
   });
 
   TimerSettings copyWith({

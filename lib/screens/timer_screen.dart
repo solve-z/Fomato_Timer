@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/timer_provider.dart';
 import '../providers/farm_provider.dart';
 import '../providers/task_provider.dart';
-import '../models/timer_state.dart';
 import '../models/farm.dart';
 import '../utils/constants.dart';
 
