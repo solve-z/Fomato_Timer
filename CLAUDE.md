@@ -62,19 +62,20 @@ lib/
 ├── models/                   # 데이터 모델
 │   ├── farm.dart
 │   ├── timer_state.dart
-│   └── statistics.dart
+│   └── statistics.dart       # 일별/월별/전체 통계 모델
 ├── providers/                # Riverpod Providers
 │   ├── farm_provider.dart
 │   ├── timer_provider.dart
-│   └── settings_provider.dart
+│   └── statistics_provider.dart
 ├── screens/                  # 화면 위젯
 │   ├── timer_screen.dart
 │   ├── farm_screen.dart
-│   ├── statistics_screen.dart
+│   ├── statistics_screen.dart # 캘린더 + 인라인 상세 보기
 │   └── settings_screen.dart
 ├── widgets/                  # 재사용 위젯
 │   ├── timer_widget.dart
 │   ├── farm_widget.dart
+│   ├── daily_detail_dialog.dart # 일별 상세 보기 위젯
 │   └── bottom_navigation.dart
 ├── services/                 # 서비스 로직
 │   ├── timer_service.dart
@@ -99,9 +100,12 @@ lib/
 - 농장 선택 시 타이머와 연동
 
 ### 3. 통계 (Statistics)
-- 캘린더 뷰: 토마토 수확 표시
+- 캘린더 뷰: 토마토 수확 표시 (실제 데이터 연동)
 - 월간 요약: 총 토마토, 집중 시간 등
-- 농장별 필터링
+- 농장별 필터링 (전체/개별 농장)
+- 일별 상세 보기: 캘린더 날짜 클릭 시 인라인 표시
+- 특정 날짜의 농장별 활동 내역 상세 조회
+- 농장 선택 없이 활동한 경우도 통계에 포함
 
 ### 4. 설정 (Settings)
 - 타이머 설정 (집중/휴식 시간, 반복 횟수)
