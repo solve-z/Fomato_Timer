@@ -4,6 +4,7 @@ import '../providers/timer_provider.dart';
 import '../providers/farm_provider.dart';
 import '../providers/task_provider.dart';
 import '../models/farm.dart';
+import '../models/timer_state.dart';
 import '../utils/constants.dart';
 
 /// 타이머 메인 화면
@@ -164,44 +165,7 @@ class TimerScreen extends ConsumerWidget {
                     const SizedBox(height: 40),
 
                     // 컨트롤 버튼들
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // 시작/일시정지 버튼
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            if (timerState.isRunning) {
-                              ref.read(timerProvider.notifier).pause();
-                            } else {
-                              ref.read(timerProvider.notifier).start();
-                            }
-                          },
-                          icon: Icon(
-                            timerState.isRunning ? Icons.pause : Icons.play_arrow,
-                          ),
-                          label: Text(
-                            timerState.isRunning ? '일시정지' : '시작',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                        ),
-
-                        // 정지 버튼
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            ref.read(timerProvider.notifier).stop();
-                          },
-                          icon: const Icon(Icons.stop),
-                          label: const Text('정지'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                        ),
-                      ],
-                    ),
+                    _buildTimerButtons(context, ref, timerState),
                   ],
                 ),
               ),
@@ -233,6 +197,168 @@ class TimerScreen extends ConsumerWidget {
             Navigator.of(context).pop();
           },
         ),
+      ),
+    );
+  }
+
+  /// 타이머 상태에 따른 버튼들 빌드
+  Widget _buildTimerButtons(BuildContext context, WidgetRef ref, timerState) {
+    // 초기 상태: 시작 버튼만 표시
+    if (timerState.status == TimerStatus.initial) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () => ref.read(timerProvider.notifier).start(),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('시작'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    // 실행 중: 일시정지 버튼만 표시
+    else if (timerState.status == TimerStatus.running) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () => ref.read(timerProvider.notifier).pause(),
+            icon: const Icon(Icons.pause),
+            label: const Text('일시정지'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade500,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    // 일시정지 또는 완료: 시작, 정지, 리셋 버튼 표시
+    else {
+      return Column(
+        children: [
+          // 첫 번째 행: 시작 버튼
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => ref.read(timerProvider.notifier).start(),
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('시작'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 두 번째 행: 정지, 리셋 버튼
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _showStopConfirmation(context, ref),
+                icon: const Icon(Icons.stop),
+                label: const Text('정지'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade600,
+                  side: BorderSide(color: Colors.red.shade600),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _showResetConfirmation(context, ref),
+                icon: const Icon(Icons.refresh),
+                label: const Text('리셋'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey.shade600,
+                  side: BorderSide(color: Colors.grey.shade600),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+  }
+
+  /// 정지 확인 다이얼로그
+  void _showStopConfirmation(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange.shade600),
+            const SizedBox(width: 8),
+            const Text('타이머 정지'),
+          ],
+        ),
+        content: const Text(
+          '현재 진행 중인 타이머를 정지하시겠습니까?\n'
+          '진행 상황은 유지되지만 타이머는 멈춥니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(timerProvider.notifier).stop();
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600),
+            child: const Text('정지', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 리셋 확인 다이얼로그
+  void _showResetConfirmation(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red.shade600),
+            const SizedBox(width: 8),
+            const Text('타이머 리셋'),
+          ],
+        ),
+        content: const Text(
+          '타이머를 완전히 초기화하시겠습니까?\n'
+          '현재 라운드와 진행 상황이 모두 초기화됩니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(timerProvider.notifier).reset();
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600),
+            child: const Text('리셋', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

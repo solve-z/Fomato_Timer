@@ -64,9 +64,9 @@ class TimerNotifier extends StateNotifier<TimerState> {
     _timerService?.stop();
   }
 
-  /// 타이머 리셋
+  /// 타이머 리셋 (초기 상태로 완전 리셋)
   void reset() {
-    _timerService?.reset();
+    _timerService?.stop(); // 완전히 초기 상태로 리셋
   }
 
   /// 농장 선택
