@@ -48,31 +48,35 @@ flutter pub add flutter_local_notifications
 
 ### 🎨 **2.1 앱 테마 및 상수 설정**
 **학습 포인트**: Flutter 테마 시스템, 디자인 토큰
-- [ ] `lib/utils/constants.dart` - 앱 전역 상수
-- [ ] `lib/utils/theme.dart` - 앱 테마 (appstyle.json 기반)
-- [ ] 컬러 팔레트: Primary #4CAF50, Secondary #FFC107
-- [ ] 텍스트 스타일, 버튼 스타일 정의
+- [x] `lib/utils/constants.dart` - 앱 전역 상수 (타이머 모드별 색상/텍스트 포함)
+- [x] `lib/utils/theme.dart` - 앱 테마 (appstyle.json 기반)
+- [x] 컬러 팔레트: Primary #4CAF50, Secondary #FFC107
+- [x] 텍스트 스타일, 버튼 스타일 정의
+- [x] 타이머 모드별 상수 클래스 추가 (TimerTexts, TimerColors)
 
-**💾 커밋**: `🎨 feat: 앱 테마 시스템 구축`
+**💾 커밋**: `🎨 feat: 앱 테마 시스템 구축 및 타이머 상수 관리`
 
 ### 📋 **2.2 핵심 데이터 모델 생성**
 **학습 포인트**: Dart 클래스 설계, JSON 직렬화
 - [x] `models/farm.dart` - 농장(프로젝트) 모델
 - [x] `models/timer_state.dart` - 타이머 상태 모델
 - [x] `models/statistics.dart` - 통계 데이터 모델 (향상된 버전)
+- [x] `models/task.dart` - 농장 내 할일 관리 모델
 - [x] 각 모델에 `toJson()`, `fromJson()` 메서드 구현
 - [x] `DailySummary` 모델 추가 - 일별 활동 요약
 
-**💾 커밋**: `📋 feat: 핵심 데이터 모델 정의`
+**💾 커밋**: `📋 feat: 핵심 데이터 모델 정의 + 할일 관리 모델 추가`
 
 ### 🔄 **2.3 Riverpod Provider 기초**
 **학습 포인트**: 상태관리 패턴, Provider vs StateNotifier
-- [ ] `providers/farm_provider.dart` - 농장 목록 관리
-- [ ] `providers/timer_provider.dart` - 타이머 상태 관리
+- [x] `providers/farm_provider.dart` - 농장 목록 관리
+- [x] `providers/timer_provider.dart` - 타이머 상태 관리
+- [x] `providers/task_provider.dart` - 할일 목록 상태 관리
+- [x] `providers/statistics_provider.dart` - 통계 데이터 관리
 - [ ] `providers/settings_provider.dart` - 앱 설정 관리
-- [ ] `main.dart`에 ProviderScope 래핑
+- [x] `main.dart`에 ProviderScope 래핑
 
-**💾 커밋**: `🔄 feat: Riverpod 기본 상태관리 구조 완성`
+**💾 커밋**: `🔄 feat: Riverpod 상태관리 구조 완성 - 농장/할일/통계 Provider 구현`
 
 ---
 
@@ -80,21 +84,22 @@ flutter pub add flutter_local_notifications
 
 ### 🧭 **3.1 네비게이션 시스템**
 **학습 포인트**: BottomNavigationBar, 화면 전환 관리
-- [ ] `widgets/bottom_navigation.dart` - 하단 네비게이션
-- [ ] 4개 탭: 타이머, 농장, 통계, 설정
-- [ ] 탭 전환 시 상태 유지 방법 학습
+- [x] `widgets/bottom_navigation.dart` - 하단 네비게이션
+- [x] 4개 탭: 타이머, 농장, 통계, 설정
+- [x] 탭 전환 시 상태 유지 방법 학습
 
 **💾 커밋**: `🧭 feat: 기본 네비게이션 시스템 구축`
 
 ### 📱 **3.2 기본 화면 스케폴딩**
 **학습 포인트**: Scaffold 구조, AppBar 커스터마이징
-- [ ] `screens/timer_screen.dart` - 타이머 메인 화면
-- [ ] `screens/farm_screen.dart` - 농장 관리 화면  
-- [ ] `screens/statistics_screen.dart` - 통계 보기 화면
-- [ ] `screens/settings_screen.dart` - 설정 화면
-- [ ] 각 화면에 기본 Scaffold 및 AppBar 구성
+- [x] `screens/timer_screen.dart` - 타이머 메인 화면 (농장 선택 팝업 포함)
+- [x] `screens/farm_screen.dart` - 농장 관리 화면  
+- [x] `screens/farm_detail_screen.dart` - 농장 상세/할일 관리 화면
+- [x] `screens/statistics_screen.dart` - 통계 보기 화면 (날짜별 완료 할일 포함)
+- [x] `screens/settings_screen.dart` - 설정 화면
+- [x] 각 화면에 기본 Scaffold 및 AppBar 구성
 
-**💾 커밋**: `📱 feat: 4개 메인 화면 기본 구조 완성`
+**💾 커밋**: `📱 feat: 메인 화면들 구조 완성 + 농장 상세 화면 및 할일 관리 기능`
 
 ---
 
@@ -134,21 +139,26 @@ flutter pub add flutter_local_notifications
 
 ### 🏡 **5.1 농장 CRUD 기능**
 **학습 포인트**: 리스트 관리, 폼 입력, 상태 업데이트
-- [ ] 농장 생성 다이얼로그 (이름, 색상 선택)
-- [ ] 농장 목록 표시 (ListView.builder)
-- [ ] 농장 선택 기능 (라디오 버튼 또는 체크)
-- [ ] 농장 수정/삭제 기능 (길게 눌러서 메뉴)
+- [x] 농장 생성 다이얼로그 (이름, 색상 선택)
+- [x] 농장 목록 표시 (ListView.builder)
+- [x] 농장 선택 기능 (팝업을 통한 선택)
+- [x] 농장 수정/삭제 기능 (길게 눌러서 메뉴)
+- [x] **농장 상세 페이지**: 할일 목록 관리 시스템
+- [x] **할일 CRUD**: 추가/수정/삭제, 체크박스 완료 토글
+- [x] **할일 통계**: 진행중/완료된 작업 개수 표시
 
-**💾 커밋**: `🏡 feat: 농장 CRUD 기본 기능 완성`
+**💾 커밋**: `🏡 feat: 농장 CRUD + 할일 관리 시스템 완성`
 
 ### 🌿 **5.2 농장 시각화 (잔디형 UI)**
 **학습 포인트**: GridView, 커스텀 페인팅, 데이터 시각화
-- [ ] `widgets/farm_widget.dart` - 농장 카드 위젯
-- [ ] 잔디 모양 그리드로 토마토 수확 현황 표시
-- [ ] 수확량에 따른 색상 단계 (연두 → 진한 녹색)
-- [ ] 농장 선택 시 타이머와 자동 연동
+- [x] 농장 카드 UI (farm_screen.dart에 구현)
+- [x] 잔디 모양 그리드로 토마토 수확 현황 표시
+- [x] 수확량에 따른 색상 단계 (연두 → 진한 녹색)
+- [x] **개선된 농장 선택**: 바텀시트 팝업으로 농장 선택
+- [x] **할일 미리보기**: 선택된 농장의 할일 목록 표시
+- [x] **빠른 할일 추가**: 농장 선택 시 + 버튼으로 즉시 할일 추가
 
-**💾 커밋**: `🌿 feat: 농장 잔디형 시각화 완성`
+**💾 커밋**: `🌿 feat: 농장 시각화 + 향상된 선택 UI 완성`
 
 ---
 
@@ -169,12 +179,24 @@ flutter pub add flutter_local_notifications
 - [x] 총 토마토 수확 개수
 - [x] 총 수확한 날 계산 (고유 날짜 기준)
 - [x] 총 집중 시간 (시:분 형식)
-- [x] 완료한 세션 수
+- [x] **완료한 할일 수** (세션 수 대신 더 의미있는 지표로 변경)
 - [x] 일평균 집중 시간
 - [x] 카드형 요약 UI
 - [x] 농장 선택 없는 활동도 통계에 포함
+- [x] **날짜별 완료 할일 표시**: 농장 클릭 시 해당 날짜의 완료된 할일 목록 표시
 
-**💾 커밋**: `📈 feat: 다중 농장 지원 월간 통계 요약 대시보드 완성`
+**💾 커밋**: `📈 feat: 월간 통계 대시보드 + 할일 기반 통계 시스템 완성`
+
+### 🎉 **6.3 할일 관리 시스템 통합**
+**학습 포인트**: 복합적 기능 연동, 사용자 경험 개선
+- [x] **Timer 화면 개선**: 농장 미선택 시 "농장을 선택하세요..." 안내 문구
+- [x] **바텀시트 농장 선택**: 드래그 가능한 팝업으로 농장 선택 UI 개선
+- [x] **할일 미리보기**: 선택한 농장의 할일 목록 미리보기 (최대 3개)
+- [x] **즉시 할일 추가**: 농장 선택 창에서 + 버튼으로 빠른 할일 추가
+- [x] **통계 연동**: 날짜별 농장 클릭 시 완료된 할일 목록 바텀시트 표시
+- [x] **월간 지표 개선**: 완료 세션 대신 완료된 할일 수로 더 의미있는 통계 제공
+
+**💾 커밋**: `🎉 feat: 할일 관리 시스템과 모든 화면 통합 완료`
 
 ---
 
@@ -245,14 +267,17 @@ flutter pub add flutter_local_notifications
 - [ ] Hot Reload vs Hot Restart
 
 ### **상태 관리 이해**
-- [ ] Provider 패턴의 장점
-- [ ] StateNotifier vs StateProvider 차이
-- [ ] watch() vs read() 사용법
-- [ ] 상태 변경이 UI에 반영되는 과정
+- [x] Provider 패턴의 장점
+- [x] StateNotifier vs StateProvider 차이
+- [x] watch() vs read() 사용법
+- [x] 상태 변경이 UI에 반영되는 과정
+- [x] **복합 Provider 연동**: 농장-할일-통계 간 데이터 연동
 
 ### **실전 개발 스킬**
-- [ ] 프로젝트 구조 설계 능력
-- [ ] 재사용 가능한 위젯 작성
+- [x] 프로젝트 구조 설계 능력
+- [x] 재사용 가능한 위젯 작성 (카드, 바텀시트, 다이얼로그 등)
+- [x] **복합 UI 패턴**: 바텀시트 팝업, 인라인 상세보기, 드래그 가능한 UI
+- [x] **상수 중심 개발**: 타이머 모드별 색상/텍스트 상수 관리
 - [ ] 비동기 데이터 처리
 - [ ] 로컬 저장소 활용
 - [ ] 앱 빌드 및 배포 과정

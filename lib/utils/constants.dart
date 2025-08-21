@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/timer_state.dart';
 
 /// 앱 전역 상수 정의
 class AppConstants {
@@ -116,16 +117,21 @@ class AppDurations {
   static const Duration animationSlow = Duration(milliseconds: 500);
 }
 
-enum TimerMode {
-  focus,
-  shortBreak,
-  longBreak,
-  stopwatch,
+
+class TimerTexts {
+  static const Map<TimerMode, String> modeTexts = {
+    TimerMode.focus: '집중 시간',
+    TimerMode.shortBreak: '짧은 휴식',
+    TimerMode.longBreak: '긴 휴식',
+    TimerMode.stopped: '정지',
+  };
 }
 
-enum TimerStatus {
-  idle,
-  running,
-  paused,
-  completed,
+class TimerColors {
+  static const Map<TimerMode, Color> modeColors = {
+    TimerMode.focus: Color(0xFFEF5350),        // 집중: 빨간색
+    TimerMode.shortBreak: Color(0xFF66BB6A),   // 짧은 휴식: 녹색
+    TimerMode.longBreak: Color(0xFF42A5F5),    // 긴 휴식: 파란색
+    TimerMode.stopped: Color(0xFF9E9E9E),      // 정지: 회색
+  };
 }

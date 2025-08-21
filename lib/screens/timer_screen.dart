@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/timer_provider.dart';
 import '../providers/farm_provider.dart';
+import '../providers/task_provider.dart';
 import '../models/timer_state.dart';
+import '../models/farm.dart';
+import '../utils/constants.dart';
 
 /// 타이머 메인 화면
 /// 
@@ -18,17 +21,18 @@ class TimerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timerState = ref.watch(timerProvider);
     final selectedFarm = ref.watch(selectedFarmProvider);
-    final farmList = ref.watch(farmListProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fomato Timer'),
         centerTitle: true,
         actions: [
-          // 농장 선택 버튼
+          // 설정 버튼 (나중에 사용)
           IconButton(
-            icon: const Icon(Icons.grass),
-            onPressed: () => _showFarmSelector(context, ref),
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              // 설정 화면으로 이동 (추후 구현)
+            },
           ),
         ],
       ),
@@ -36,37 +40,73 @@ class TimerScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // 선택된 농장 표시
-            if (selectedFarm != null) ...[
-              Card(
+            // 농장 선택 영역
+            GestureDetector(
+              onTap: () => _showFarmSelector(context, ref),
+              child: Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: Color(int.parse(selectedFarm.color.substring(1), radix: 16) + 0xFF000000),
-                          shape: BoxShape.circle,
+                  padding: const EdgeInsets.all(16.0),
+                  child: selectedFarm != null
+                      ? Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: Color(int.parse(selectedFarm.color.substring(1), radix: 16) + 0xFF000000),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                selectedFarm.name,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '🍅 ${selectedFarm.tomatoCount}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.grey,
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Icon(
+                              Icons.grass_outlined,
+                              color: Colors.grey.shade400,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                '농장을 선택하세요...',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Colors.grey.shade600,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.grey,
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        selectedFarm.name,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const Spacer(),
-                      Text(
-                        '🍅 ${selectedFarm.tomatoCount}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-            ],
+            ),
+            const SizedBox(height: 20),
 
             // 메인 타이머 영역
             Expanded(
@@ -76,9 +116,9 @@ class TimerScreen extends ConsumerWidget {
                   children: [
                     // 현재 모드 표시
                     Text(
-                      _getModeText(timerState.mode),
+                      '집중 시간',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: _getModeColor(timerState.mode),
+                        color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -91,17 +131,17 @@ class TimerScreen extends ConsumerWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: _getModeColor(timerState.mode),
+                          color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
                           width: 4,
                         ),
-                        color: _getModeColor(timerState.mode).withValues(alpha: 0.1),
+                        color: (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.1),
                       ),
                       child: Center(
                         child: Text(
                           timerState.formattedTime,
                           style: Theme.of(context).textTheme.displayLarge?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: _getModeColor(timerState.mode),
+                            color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
                           ),
                         ),
                       ),
@@ -116,7 +156,7 @@ class TimerScreen extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           child: Icon(
                             index < timerState.currentRound ? Icons.circle : Icons.circle_outlined,
-                            color: _getModeColor(timerState.mode),
+                            color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
                             size: 16,
                           ),
                         );
@@ -144,7 +184,7 @@ class TimerScreen extends ConsumerWidget {
                             timerState.isRunning ? '일시정지' : '시작',
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _getModeColor(timerState.mode),
+                            backgroundColor: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           ),
@@ -173,71 +213,412 @@ class TimerScreen extends ConsumerWidget {
     );
   }
 
-  /// 농장 선택 다이얼로그
+  /// 농장 선택 바텀시트
   void _showFarmSelector(BuildContext context, WidgetRef ref) {
-    final farmList = ref.read(farmListProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => _FarmSelectorBottomSheet(
+          scrollController: scrollController,
+          onFarmSelected: (farm) {
+            ref.read(selectedFarmProvider.notifier).state = farm;
+            ref.read(timerProvider.notifier).selectFarm(farm.id);
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// 농장 선택 바텀시트 위젯
+class _FarmSelectorBottomSheet extends ConsumerStatefulWidget {
+  final ScrollController scrollController;
+  final Function(Farm) onFarmSelected;
+
+  const _FarmSelectorBottomSheet({
+    required this.scrollController,
+    required this.onFarmSelected,
+  });
+
+  @override
+  ConsumerState<_FarmSelectorBottomSheet> createState() => _FarmSelectorBottomSheetState();
+}
+
+class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomSheet> {
+  Farm? _selectedFarm;
+  final TextEditingController _taskController = TextEditingController();
+
+  @override
+  void dispose() {
+    _taskController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final farmList = ref.watch(farmListProvider);
+    final currentSelected = ref.watch(selectedFarmProvider);
+
+    // 선택된 농장이 없으면 첫 번째 농장이나 가장 최근 선택된 농장을 기본 선택
+    if (_selectedFarm == null && farmList.isNotEmpty) {
+      _selectedFarm = currentSelected ?? farmList.first;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // 핸들 바
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 제목
+          Row(
+            children: [
+              const Text(
+                '농장 선택',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // 농장이 없는 경우
+          if (farmList.isEmpty) ...[
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.grass_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '농장 없음',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '집중할 프로젝트를 위한\n첫 번째 농장을 만들어보세요!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showCreateFarmDialog(context, ref);
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('농장 만들기'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+          ]
+          // 농장이 있는 경우
+          else ...[
+            Expanded(
+              child: ListView(
+                controller: widget.scrollController,
+                children: [
+                  // 농장 목록
+                  ...farmList.map((farm) {
+                    final isSelected = _selectedFarm?.id == farm.id;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      color: isSelected ? Color(int.parse(farm.color.substring(1), radix: 16) + 0xFF000000).withValues(alpha: 0.1) : null,
+                      child: ListTile(
+                        leading: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: Color(int.parse(farm.color.substring(1), radix: 16) + 0xFF000000),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                farm.name,
+                                style: TextStyle(
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add, size: 20),
+                              onPressed: () => _showQuickAddTask(context, farm),
+                              tooltip: '할일 추가',
+                            ),
+                          ],
+                        ),
+                        subtitle: Text('🍅 ${farm.tomatoCount}개 수확'),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle, color: Theme.of(context).primaryColor)
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedFarm = farm;
+                          });
+                        },
+                      ),
+                    );
+                  }),
+
+                  // 선택된 농장의 할일 목록
+                  if (_selectedFarm != null) ...[
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${_selectedFarm!.name}의 할일',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final farmTasks = ref.watch(farmTasksProvider(_selectedFarm!.id));
+                        
+                        if (farmTasks.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              '할일이 없습니다.',
+                              style: TextStyle(color: Colors.grey.shade600),
+                              textAlign: TextAlign.center,
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: farmTasks.take(3).map((task) {
+                            return ListTile(
+                              dense: true,
+                              leading: Icon(
+                                task.isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                                color: task.isCompleted ? Colors.green : Colors.grey,
+                                size: 20,
+                              ),
+                              title: Text(
+                                task.title,
+                                style: TextStyle(
+                                  decoration: task.isCompleted
+                                      ? TextDecoration.lineThrough
+                                      : TextDecoration.none,
+                                  color: task.isCompleted ? Colors.grey : null,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              onTap: () {
+                                ref.read(taskListProvider.notifier).toggleTask(task.id);
+                              },
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                    if (ref.watch(farmTasksProvider(_selectedFarm!.id)).length > 3)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          '+ ${ref.watch(farmTasksProvider(_selectedFarm!.id)).length - 3}개 더',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+            
+            // 하단 버튼들
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _showCreateFarmDialog(context, ref);
+                    },
+                    child: const Text('농장 만들기'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _selectedFarm != null
+                        ? () => widget.onFarmSelected(_selectedFarm!)
+                        : null,
+                    child: const Text('선택하기'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showQuickAddTask(BuildContext context, Farm farm) {
+    final taskController = TextEditingController();
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('농장 선택'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: farmList.map((farm) {
-            return ListTile(
-              leading: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Color(int.parse(farm.color.substring(1), radix: 16) + 0xFF000000),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              title: Text(farm.name),
-              trailing: Text('🍅 ${farm.tomatoCount}'),
-              onTap: () {
-                ref.read(selectedFarmProvider.notifier).state = farm;
-                ref.read(timerProvider.notifier).selectFarm(farm.id);
-                Navigator.of(context).pop();
-              },
-            );
-          }).toList(),
+        title: Text('${farm.name}에 할일 추가'),
+        content: TextField(
+          controller: taskController,
+          decoration: const InputDecoration(
+            labelText: '할일 제목',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('취소'),
           ),
+          TextButton(
+            onPressed: () {
+              if (taskController.text.trim().isNotEmpty) {
+                ref.read(taskListProvider.notifier).addTask(
+                  farm.id,
+                  taskController.text.trim(),
+                );
+              }
+              Navigator.of(context).pop();
+            },
+            child: const Text('추가'),
+          ),
         ],
       ),
     );
   }
 
-  /// 모드별 텍스트 반환
-  String _getModeText(TimerMode mode) {
-    switch (mode) {
-      case TimerMode.focus:
-        return '집중 시간';
-      case TimerMode.shortBreak:
-        return '짧은 휴식';
-      case TimerMode.longBreak:
-        return '긴 휴식';
-      case TimerMode.stopped:
-        return '정지';
-    }
+  void _showCreateFarmDialog(BuildContext context, WidgetRef ref) {
+    // 농장 생성 다이얼로그 (farm_screen.dart와 동일한 로직)
+    final nameController = TextEditingController();
+    String selectedColor = '#4CAF50';
+
+    final colors = [
+      '#4CAF50', '#2196F3', '#FF9800', '#9C27B0',
+      '#F44336', '#009688', '#FF5722', '#607D8B',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('새 농장 만들기'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: '농장 이름',
+                  hintText: '예: Flutter 공부',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              const Text('농장 색상:'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: colors.map((color) {
+                  final isSelected = selectedColor == color;
+                  return GestureDetector(
+                    onTap: () => setState(() => selectedColor = color),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Color(int.parse(color.substring(1), radix: 16) + 0xFF000000),
+                        shape: BoxShape.circle,
+                        border: isSelected 
+                            ? Border.all(color: Colors.black, width: 2)
+                            : null,
+                      ),
+                      child: isSelected 
+                          ? const Icon(Icons.check, color: Colors.white, size: 16)
+                          : null,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.trim().isNotEmpty) {
+                  ref.read(farmListProvider.notifier).addFarm(
+                    nameController.text.trim(),
+                    selectedColor,
+                  );
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('만들기'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  /// 모드별 색상 반환
-  Color _getModeColor(TimerMode mode) {
-    switch (mode) {
-      case TimerMode.focus:
-        return Colors.red.shade400;      // 집중: 빨간색
-      case TimerMode.shortBreak:
-        return Colors.green.shade400;    // 짧은 휴식: 녹색
-      case TimerMode.longBreak:
-        return Colors.blue.shade400;     // 긴 휴식: 파란색
-      case TimerMode.stopped:
-        return Colors.grey.shade400;     // 정지: 회색
-    }
-  }
 }

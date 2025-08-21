@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/farm_provider.dart';
 import '../models/farm.dart';
+import 'farm_detail_screen.dart';
 
 /// 농장 관리 화면
 /// 
@@ -94,7 +95,12 @@ class FarmScreen extends ConsumerWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () {
-              ref.read(selectedFarmProvider.notifier).state = farm;
+              // 농장 상세 페이지로 이동
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => FarmDetailScreen(farm: farm),
+                ),
+              );
             },
             onLongPress: () => _showFarmOptions(context, ref, farm),
             child: Padding(

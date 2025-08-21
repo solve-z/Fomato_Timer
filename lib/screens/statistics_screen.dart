@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/statistics_provider.dart';
 import '../providers/farm_provider.dart';
-import '../widgets/daily_detail_dialog.dart';
+import '../providers/task_provider.dart';
 import '../models/statistics.dart';
 
 /// 통계 화면
@@ -199,9 +199,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
             Expanded(
               child: _buildSummaryCard(
                 context,
-                '완료 세션',
-                '${monthlyStats.totalSessions}회',
-                Icons.check_circle,
+                '완료 할일',
+                '${_getMonthlyCompletedTasksCount()}개',
+                Icons.task_alt,
                 Colors.purple,
               ),
             ),
@@ -659,42 +659,193 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
             ? Color(int.parse(farm.color.substring(1), radix: 16) + 0xFF000000)
             : Colors.grey.shade400;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: farmColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: farmColor.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(color: farmColor, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              farmName,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+    return GestureDetector(
+      onTap: () => _showCompletedTasks(context, selectedDate!, activity.farmId, farmName),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: farmColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: farmColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(color: farmColor, shape: BoxShape.circle),
             ),
-          ),
-          Text(
-            '🍅 ${activity.tomatoCount}',
-            style: const TextStyle(fontSize: 12),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '⏱️ ${activity.focusMinutes}분',
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                farmName,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              ),
+            ),
+            Text(
+              '🍅 ${activity.tomatoCount}',
+              style: const TextStyle(fontSize: 12),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '⏱️ ${activity.focusMinutes}분',
+              style: const TextStyle(fontSize: 12),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: Colors.grey.shade600,
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  /// 완료된 할일 목록 표시
+  void _showCompletedTasks(BuildContext context, DateTime date, String? farmId, String farmName) {
+    final completedTasks = ref.read(dateCompletedTasksProvider({
+      'date': date,
+      'farmId': farmId,
+    }));
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 헤더
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${date.month}/${date.day} $farmName 완료 할일',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 10),
+
+            // 완료된 할일 목록
+            if (completedTasks.isEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.task_outlined,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '이 날에 완료된 할일이 없습니다',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.4,
+                child: ListView.builder(
+                  itemCount: completedTasks.length,
+                  itemBuilder: (context, index) {
+                    final task = completedTasks[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: const TextStyle(
+                                decoration: TextDecoration.lineThrough,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          if (task.completedAt != null)
+                            Text(
+                              '${task.completedAt!.hour.toString().padLeft(2, '0')}:${task.completedAt!.minute.toString().padLeft(2, '0')}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 월별 완료된 할일 개수 계산
+  int _getMonthlyCompletedTasksCount() {
+    final statisticsState = ref.read(statisticsProvider);
+    final selectedMonth = statisticsState.selectedMonth;
+    final selectedFarmId = statisticsState.selectedFarmId;
+    
+    final tasks = ref.read(taskListProvider);
+    
+    return tasks.where((task) {
+      if (!task.isCompleted || task.completedAt == null) return false;
+      
+      final completedDate = task.completedAt!;
+      final isSameMonth = completedDate.year == selectedMonth.year &&
+          completedDate.month == selectedMonth.month;
+      
+      if (!isSameMonth) return false;
+      
+      // 농장 필터 적용
+      if (selectedFarmId != null) {
+        return task.farmId == selectedFarmId;
+      }
+      
+      return true;
+    }).length;
   }
 
   /// 요일 문자열 변환
