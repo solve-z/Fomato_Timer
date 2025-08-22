@@ -7,6 +7,7 @@ import '../utils/constants.dart';
 import '../models/farm.dart';
 import 'farm_provider.dart';
 import 'statistics_provider.dart';
+import 'settings_provider.dart';
 
 /// 타이머 상태 관리 클래스
 class TimerNotifier extends StateNotifier<TimerState> {
@@ -32,6 +33,9 @@ class TimerNotifier extends StateNotifier<TimerState> {
 
     // 현재 서비스 상태로 초기화
     state = _timerService!.currentState;
+
+    // 알림 콜백 설정 (초기화 후)
+    _setupNotificationCallbacks();
 
     // 서비스 상태 변화 구독
     _stateSubscription = _timerService!.stateStream.listen(
@@ -93,6 +97,15 @@ class TimerNotifier extends StateNotifier<TimerState> {
         // 설정 로드 실패 시 기본 설정 유지
       }
     });
+  }
+
+  /// 알림 콜백 설정
+  void _setupNotificationCallbacks() {
+    _timerService?.setNotificationCallbacks(
+      getFarmName: () => _getSelectedFarmName(),
+      getTomatoCount: () => _getSelectedFarmTomatoCount(),
+      isNotificationEnabled: () => _isNotificationEnabled(),
+    );
   }
 
   /// 타이머 시작
@@ -252,6 +265,36 @@ class TimerNotifier extends StateNotifier<TimerState> {
         onError: (error) {},
         onDone: () {},
       );
+    }
+  }
+
+  /// 알림 콜백: 선택된 농장 이름 반환
+  String _getSelectedFarmName() {
+    try {
+      final selectedFarm = ref.read(selectedFarmProvider);
+      return selectedFarm?.name ?? '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /// 알림 콜백: 선택된 농장의 토마토 개수 반환
+  int _getSelectedFarmTomatoCount() {
+    try {
+      final selectedFarm = ref.read(selectedFarmProvider);
+      return selectedFarm?.tomatoCount ?? 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// 알림 콜백: 알림 활성화 여부 반환
+  bool _isNotificationEnabled() {
+    try {
+      final notificationSettings = ref.read(notificationSettingsProvider);
+      return notificationSettings.notificationEnabled;
+    } catch (e) {
+      return false; // 기본값은 비활성화
     }
   }
 

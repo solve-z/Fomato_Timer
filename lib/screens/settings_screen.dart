@@ -7,6 +7,7 @@ import '../providers/farm_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/statistics_provider.dart';
 import '../services/storage_service.dart';
+import '../services/notification_service.dart';
 import '../models/timer_state.dart';
 
 /// 설정 화면
@@ -334,8 +335,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: const Text('푸시 알림'),
               subtitle: const Text('앱이 백그라운드에 있을 때도 알림'),
               value: notificationSettings.notificationEnabled,
-              onChanged: (value) {
-                ref.read(notificationSettingsProvider.notifier).setNotificationEnabled(value);
+              onChanged: (value) async {
+                if (value) {
+                  // 알림 활성화 시 권한 요청
+                  final granted = await NotificationService().requestPermissions();
+                  if (granted) {
+                    ref.read(notificationSettingsProvider.notifier).setNotificationEnabled(value);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('알림 권한이 허용되었습니다'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('알림 권한이 거부되었습니다. 설정에서 직접 허용해주세요'),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  // 알림 비활성화
+                  ref.read(notificationSettingsProvider.notifier).setNotificationEnabled(value);
+                }
               },
               secondary: const Icon(Icons.notifications),
             ),

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../models/timer_state.dart';
 import '../utils/constants.dart';
+import 'notification_service.dart';
 
 /// 타이머 백그라운드 서비스
 ///
@@ -31,11 +33,28 @@ class TimerService {
   final StreamController<TimerState> _stateController =
       StreamController<TimerState>.broadcast();
   TimerState _currentState = TimerState.initial();
+  final NotificationService _notificationService = NotificationService();
+
+  // 알림 관련 콜백 함수들
+  String Function()? _getFarmName;
+  int Function()? _getTomatoCount;
+  bool Function()? _isNotificationEnabled;
 
   /// 타이머 상태 스트림
   Stream<TimerState> get stateStream {
     // 스트림 구독 시 현재 상태 즉시 전송
     return _stateController.stream.asBroadcastStream();
+  }
+
+  /// 알림 콜백 설정
+  void setNotificationCallbacks({
+    String Function()? getFarmName,
+    int Function()? getTomatoCount,
+    bool Function()? isNotificationEnabled,
+  }) {
+    _getFarmName = getFarmName;
+    _getTomatoCount = getTomatoCount;
+    _isNotificationEnabled = isNotificationEnabled;
   }
 
   /// 현재 상태
@@ -52,6 +71,9 @@ class TimerService {
       ),
     );
 
+    // 실행 중 알림 시작
+    _showRunningNotification();
+    
     _startTicking();
   }
 
@@ -59,6 +81,9 @@ class TimerService {
   void pause() {
     _timer?.cancel();
     _updateState(_currentState.copyWith(status: TimerStatus.paused));
+    
+    // 실행 중 알림 제거
+    _cancelRunningNotification();
   }
 
   /// 타이머 재시작
@@ -66,12 +91,20 @@ class TimerService {
     if (_currentState.status != TimerStatus.paused) return;
 
     _updateState(_currentState.copyWith(status: TimerStatus.running));
+    
+    // 실행 중 알림 다시 시작
+    _showRunningNotification();
+    
     _startTicking();
   }
 
   /// 타이머 정지 (초기 상태로 리셋)
   void stop() {
     _timer?.cancel();
+    
+    // 실행 중 알림 제거
+    _cancelRunningNotification();
+    
     _updateState(
       TimerState.initial().copyWith(
         selectedFarmId: _currentState.selectedFarmId,
@@ -159,6 +192,9 @@ class TimerService {
         _updateState(
           _currentState.copyWith(remainingSeconds: newRemainingSeconds),
         );
+        
+        // 실행 중 알림 업데이트 (매초)
+        _updateRunningNotification();
       } else if (newRemainingSeconds == 0) {
         // 0초 상태로 업데이트
         _updateState(_currentState.copyWith(remainingSeconds: 0));
@@ -172,6 +208,12 @@ class TimerService {
             endTime: DateTime.now(),
           ),
         );
+        
+        // 실행 중 알림 제거
+        _cancelRunningNotification();
+        
+        // 완료 시 알림 전송
+        _sendCompletionNotification();
       }
     });
   }
@@ -198,12 +240,6 @@ class TimerService {
       case TimerMode.stopped:
         return 0;
     }
-  }
-
-  /// 서비스 종료
-  void dispose() {
-    _timer?.cancel();
-    _stateController.close();
   }
 
   /// 설정 업데이트 (새 인스턴스 생성 필요)
@@ -259,4 +295,132 @@ class TimerService {
 
   /// 포맷된 시간 문자열 (MM:SS)
   String get formattedTime => _currentState.formattedTime;
+
+  /// 완료 시 알림 전송
+  Future<void> _sendCompletionNotification() async {
+    // 알림이 비활성화되어 있으면 전송하지 않음
+    if (_isNotificationEnabled?.call() == false) return;
+
+    try {
+      if (_currentState.mode == TimerMode.focus) {
+        // 집중 완료 알림
+        final farmName = _getFarmName?.call() ?? '';
+        final tomatoCount = _getTomatoCount?.call() ?? 0;
+        
+        await _notificationService.showFocusCompleteNotification(
+          farmName: farmName.isEmpty ? '농장' : farmName,
+          tomatoCount: tomatoCount,
+        );
+      } else {
+        // 휴식 완료 알림
+        final isLongBreak = _currentState.mode == TimerMode.longBreak;
+        String nextMode;
+        
+        if (isLongBreak) {
+          nextMode = '집중';
+        } else {
+          // 짧은 휴식 후에는 다음 라운드 확인
+          if (_currentState.currentRound >= _roundsUntilLongBreak) {
+            nextMode = '긴 휴식';
+          } else {
+            nextMode = '집중';
+          }
+        }
+        
+        await _notificationService.showBreakCompleteNotification(
+          isLongBreak: isLongBreak,
+          nextMode: nextMode,
+        );
+      }
+    } catch (e) {
+      // 알림 전송 실패 시 무시 (앱 기능에는 영향 없음)
+      if (kDebugMode) {
+        print('Failed to send completion notification: $e');
+      }
+    }
+  }
+
+  /// 실행 중 알림 표시
+  void _showRunningNotification() {
+    // 알림이 비활성화되어 있으면 표시하지 않음
+    if (_isNotificationEnabled?.call() == false) return;
+
+    try {
+      final mode = _getModeText(_currentState.mode);
+      final timeLeft = _formatTime(_currentState.remainingSeconds);
+      final farmName = _getFarmName?.call() ?? '';
+      
+      _notificationService.showTimerRunningNotification(
+        mode: mode,
+        timeLeft: timeLeft,
+        farmName: farmName,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to show running notification: $e');
+      }
+    }
+  }
+
+  /// 실행 중 알림 업데이트
+  void _updateRunningNotification() {
+    // 알림이 비활성화되어 있으면 업데이트하지 않음
+    if (_isNotificationEnabled?.call() == false) return;
+
+    try {
+      final mode = _getModeText(_currentState.mode);
+      final timeLeft = _formatTime(_currentState.remainingSeconds);
+      final farmName = _getFarmName?.call() ?? '';
+      
+      _notificationService.showTimerRunningNotification(
+        mode: mode,
+        timeLeft: timeLeft,
+        farmName: farmName,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to update running notification: $e');
+      }
+    }
+  }
+
+  /// 실행 중 알림 제거
+  void _cancelRunningNotification() {
+    try {
+      _notificationService.cancelTimerRunningNotification();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to cancel running notification: $e');
+      }
+    }
+  }
+
+  /// 모드별 텍스트 반환
+  String _getModeText(TimerMode mode) {
+    switch (mode) {
+      case TimerMode.focus:
+        return '집중 시간';
+      case TimerMode.shortBreak:
+        return '짧은 휴식';
+      case TimerMode.longBreak:
+        return '긴 휴식';
+      case TimerMode.stopped:
+        return '정지됨';
+    }
+  }
+
+  /// 시간 포맷팅 (MM:SS)
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  /// 리소스 정리
+  void dispose() {
+    _timer?.cancel();
+    _cancelRunningNotification();
+    _stateController.close();
+    _notificationService.dispose();
+  }
 }
