@@ -86,7 +86,7 @@ class FarmListNotifier extends StateNotifier<List<Farm>> {
     await _saveFarms();
   }
 
-  /// 토마토 수확 (25분 집중 완료 시)
+  /// 토마토 수확 (집중 시간 완료 시)
   void harvestTomato(String farmId) async {
     state = state.map((farm) {
       if (farm.id == farmId) {
