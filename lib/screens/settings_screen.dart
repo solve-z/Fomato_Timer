@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/timer_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/farm_provider.dart';
+import '../providers/task_provider.dart';
+import '../providers/statistics_provider.dart';
+import '../services/storage_service.dart';
 import '../models/timer_state.dart';
 
 /// 설정 화면
@@ -385,6 +389,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 );
               },
             ),
+            const Divider(),
+            ListTile(
+              leading: Icon(Icons.delete_forever, color: Colors.red.shade600),
+              title: Text(
+                '모든 데이터 초기화',
+                style: TextStyle(color: Colors.red.shade600),
+              ),
+              subtitle: const Text('농장, 통계, 설정 등 모든 데이터 삭제'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showResetDataDialog(context, ref),
+            ),
           ],
         ),
       ),
@@ -580,5 +595,123 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  /// 데이터 초기화 확인 다이얼로그
+  void _showResetDataDialog(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          icon: Icon(Icons.warning, color: Colors.red.shade600, size: 48),
+          title: const Text('모든 데이터 초기화'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('다음 데이터가 모두 삭제됩니다:'),
+              SizedBox(height: 8),
+              Text('• 모든 농장 데이터'),
+              Text('• 토마토 수확 기록'),
+              Text('• 통계 데이터'),
+              Text('• 할일 목록'),
+              Text('• 타이머 설정'),
+              Text('• 사운드/알림 설정'),
+              SizedBox(height: 16),
+              Text(
+                '이 작업은 되돌릴 수 없습니다.',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('초기화'),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (confirmed == true && context.mounted) {
+      _resetAllData(context, ref);
+    }
+  }
+
+  /// 모든 데이터 초기화 실행
+  void _resetAllData(BuildContext context, WidgetRef ref) async {
+    // BuildContext 마운트 상태 확인을 위한 변수
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    
+    try {
+      // 로딩 다이얼로그 표시
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('데이터를 초기화하고 있습니다...'),
+            ],
+          ),
+        ),
+      );
+
+      // StorageService를 통해 모든 데이터 삭제
+      await StorageService.clearAllData();
+
+      // Provider 상태들을 기본값으로 리셋
+      ref.invalidate(farmListProvider);
+      ref.invalidate(statisticsProvider);
+      ref.invalidate(timerSettingsProvider);
+      ref.invalidate(soundSettingsProvider);
+      ref.invalidate(notificationSettingsProvider);
+      ref.invalidate(selectedFarmProvider);
+      ref.invalidate(taskListProvider);
+      ref.invalidate(developerModeProvider);
+
+      // 로딩 다이얼로그 닫기
+      if (context.mounted) {
+        navigator.pop();
+        
+        // 성공 메시지 표시
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('모든 데이터가 성공적으로 초기화되었습니다'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // 로딩 다이얼로그 닫기
+      if (context.mounted) {
+        navigator.pop();
+        
+        // 에러 메시지 표시
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('데이터 초기화 중 오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
   }
 }
