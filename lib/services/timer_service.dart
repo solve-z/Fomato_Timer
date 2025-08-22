@@ -29,13 +29,17 @@ class TimerService {
   TimerState _currentState = TimerState.initial();
 
   /// 타이머 상태 스트림
-  Stream<TimerState> get stateStream => _stateController.stream;
+  Stream<TimerState> get stateStream {
+    // 스트림 구독 시 현재 상태 즉시 전송
+    return _stateController.stream.asBroadcastStream();
+  }
 
   /// 현재 상태
   TimerState get currentState => _currentState;
 
   /// 타이머 시작
   void start() {
+    print('TimerService start() 호출됨. 현재 상태: ${_currentState.status}');
     if (_currentState.status == TimerStatus.running) return;
 
     _updateState(_currentState.copyWith(
@@ -159,6 +163,7 @@ class TimerService {
 
   /// 상태 업데이트 및 스트림에 전달
   void _updateState(TimerState newState) {
+    print('TimerService _updateState() 호출됨: ${newState.status}, ${newState.remainingSeconds}초');
     _currentState = newState;
     _stateController.add(_currentState);
   }
@@ -167,11 +172,11 @@ class TimerService {
   int _getSecondsForMode(TimerMode mode) {
     switch (mode) {
       case TimerMode.focus:
-        return _focusMinutes * 60;
+        return _focusMinutes == 0 ? 5 : _focusMinutes * 60; // 개발자 모드: 0분 = 5초
       case TimerMode.shortBreak:
-        return _shortBreakMinutes * 60;
+        return _shortBreakMinutes == 0 ? 5 : _shortBreakMinutes * 60; // 개발자 모드: 0분 = 5초
       case TimerMode.longBreak:
-        return _longBreakMinutes * 60;
+        return _longBreakMinutes == 0 ? 5 : _longBreakMinutes * 60; // 개발자 모드: 0분 = 5초
       case TimerMode.stopped:
         return 0;
     }
@@ -197,10 +202,29 @@ class TimerService {
       roundsUntilLongBreak: roundsUntilLongBreak ?? _roundsUntilLongBreak,
     );
     
-    // 현재 상태 복사 (설정만 변경)
-    newService._updateState(_currentState.copyWith(
-      totalRounds: roundsUntilLongBreak ?? _roundsUntilLongBreak,
-    ));
+    // 현재 모드에 맞는 새로운 시간 계산
+    final newSeconds = newService._getSecondsForMode(_currentState.mode);
+    print('updateSettings: 새로운 시간 ${newSeconds}초 (${newSeconds/60}분), 현재 상태: ${_currentState.status}');
+    
+    // 현재 상태 복사하되, 초기 상태이거나 완료 상태일 때만 시간 업데이트
+    TimerState newState;
+    if (_currentState.status == TimerStatus.initial || _currentState.status == TimerStatus.completed) {
+      // 초기 상태거나 완료 상태일 때는 새로운 시간으로 업데이트
+      newState = _currentState.copyWith(
+        remainingSeconds: newSeconds,
+        totalSeconds: newSeconds,
+        totalRounds: roundsUntilLongBreak ?? _roundsUntilLongBreak,
+      );
+      print('updateSettings: 시간 업데이트됨 ${newState.remainingSeconds}초');
+    } else {
+      // 실행 중이거나 일시정지 상태일 때는 시간은 그대로 두고 라운드만 업데이트
+      newState = _currentState.copyWith(
+        totalRounds: roundsUntilLongBreak ?? _roundsUntilLongBreak,
+      );
+      print('updateSettings: 시간 업데이트 안됨 (타이머 실행 중)');
+    }
+    
+    newService._updateState(newState);
     
     return newService;
   }

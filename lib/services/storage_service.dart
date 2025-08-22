@@ -164,6 +164,18 @@ class StorageService {
     return prefs.getBool('notification_enabled') ?? false;
   }
 
+  /// 개발자 모드 설정 저장
+  static Future<void> saveDeveloperModeEnabled(bool enabled) async {
+    final prefs = await _prefs;
+    await prefs.setBool('developer_mode_enabled', enabled);
+  }
+
+  /// 개발자 모드 설정 로드
+  static Future<bool> loadDeveloperModeEnabled() async {
+    final prefs = await _prefs;
+    return prefs.getBool('developer_mode_enabled') ?? false;
+  }
+
   // ==== 데이터 관리 ====
 
   /// 모든 데이터 삭제 (앱 리셋)

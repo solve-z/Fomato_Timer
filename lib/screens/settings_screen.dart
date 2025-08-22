@@ -1,6 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/timer_provider.dart';
+import '../providers/settings_provider.dart';
+import '../models/timer_state.dart';
 
 /// 설정 화면
 /// 
@@ -9,12 +12,24 @@ import '../providers/timer_provider.dart';
 /// - 사운드 설정
 /// - 알림 설정
 /// - 기타 설정
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  int _versionTapCount = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final timerSettings = ref.watch(timerSettingsProvider);
+    final timerState = ref.watch(timerProvider);
+    final isDeveloperMode = ref.watch(developerModeProvider);
+    
+    // 타이머가 실행 중이거나 일시정지 상태인지 확인
+    final isTimerActive = timerState.status == TimerStatus.running || timerState.status == TimerStatus.paused;
 
     return Scaffold(
       appBar: AppBar(
@@ -26,13 +41,20 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           // 타이머 설정 섹션
           _buildSectionHeader(context, '타이머 설정'),
-          _buildTimerSettingsCard(context, ref, timerSettings),
+          _buildTimerSettingsCard(context, ref, timerSettings, isTimerActive),
           const SizedBox(height: 20),
 
           // 사운드 & 알림 설정 섹션
           _buildSectionHeader(context, '사운드 & 알림'),
           _buildSoundSettingsCard(context, ref),
           const SizedBox(height: 20),
+
+          // 개발자 모드 섹션 (활성화된 경우만 표시)
+          if (isDeveloperMode) ...[
+            _buildSectionHeader(context, '개발자 모드'),
+            _buildDeveloperModeCard(context, ref, timerSettings, isTimerActive),
+            const SizedBox(height: 20),
+          ],
 
           // 기타 설정 섹션
           _buildSectionHeader(context, '기타'),
@@ -62,61 +84,132 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   /// 타이머 설정 카드
-  Widget _buildTimerSettingsCard(BuildContext context, WidgetRef ref, TimerSettings settings) {
+  Widget _buildTimerSettingsCard(BuildContext context, WidgetRef ref, TimerSettings settings, bool isTimerActive) {
+    final isDeveloperMode = ref.watch(developerModeProvider);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // 타이머 활성화 시 경고 메시지
+            if (isTimerActive)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '타이머 실행 중에는 설정을 변경할 수 없습니다',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // 집중 시간 설정
-            _buildSliderSetting(
-              context,
-              '집중 시간',
-              '${settings.focusMinutes}분',
-              settings.focusMinutes.toDouble(),
-              15, // 최소값
-              60, // 최대값
-              5,  // 증가값
-              Icons.work,
-              (value) {
-                ref.read(timerSettingsProvider.notifier).state = 
-                    settings.copyWith(focusMinutes: value.round());
-              },
-            ),
+            if (isDeveloperMode || settings.focusMinutes >= 15) 
+              _buildSliderSetting(
+                context,
+                '집중 시간',
+                settings.focusMinutes == 0 ? '5초 (테스트)' : '${settings.focusMinutes}분',
+                isDeveloperMode ? settings.focusMinutes.toDouble() : 
+                  math.max(settings.focusMinutes.toDouble(), 15.0),
+                isDeveloperMode ? 0 : 15,
+                60,
+                isDeveloperMode ? 1 : 5,
+                Icons.work,
+                isTimerActive ? null : (value) {
+                  ref.read(timerSettingsProvider.notifier).updateSettings(
+                      settings.copyWith(focusMinutes: value.round()));
+                },
+                enabled: !isTimerActive,
+              )
+            else
+              // 개발자 모드가 아닌데 0값인 경우 자동 복원 메시지
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.warning, color: Colors.orange.shade700),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            '개발자 모드 설정이 감지되었습니다',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(timerSettingsProvider.notifier).updateSettings(
+                          const TimerSettings(),
+                        );
+                      },
+                      child: const Text('기본값으로 복원'),
+                    ),
+                  ],
+                ),
+              ),
             const Divider(),
 
             // 짧은 휴식 시간 설정
-            _buildSliderSetting(
-              context,
-              '짧은 휴식',
-              '${settings.shortBreakMinutes}분',
-              settings.shortBreakMinutes.toDouble(),
-              3,  // 최소값
-              15, // 최대값
-              1,  // 증가값
-              Icons.coffee,
-              (value) {
-                ref.read(timerSettingsProvider.notifier).state = 
-                    settings.copyWith(shortBreakMinutes: value.round());
-              },
-            ),
+            if (isDeveloperMode || settings.shortBreakMinutes >= 3)
+              _buildSliderSetting(
+                context,
+                '짧은 휴식',
+                settings.shortBreakMinutes == 0 ? '5초 (테스트)' : '${settings.shortBreakMinutes}분',
+                isDeveloperMode ? settings.shortBreakMinutes.toDouble() : 
+                  math.max(settings.shortBreakMinutes.toDouble(), 3.0),
+                isDeveloperMode ? 0 : 3,
+                15,
+                1,
+                Icons.coffee,
+                isTimerActive ? null : (value) {
+                  ref.read(timerSettingsProvider.notifier).updateSettings(
+                      settings.copyWith(shortBreakMinutes: value.round()));
+                },
+                enabled: !isTimerActive,
+              ),
             const Divider(),
 
             // 긴 휴식 시간 설정
-            _buildSliderSetting(
-              context,
-              '긴 휴식',
-              '${settings.longBreakMinutes}분',
-              settings.longBreakMinutes.toDouble(),
-              10, // 최소값
-              30, // 최대값
-              5,  // 증가값
-              Icons.hotel,
-              (value) {
-                ref.read(timerSettingsProvider.notifier).state = 
-                    settings.copyWith(longBreakMinutes: value.round());
-              },
-            ),
+            if (isDeveloperMode || settings.longBreakMinutes >= 10)
+              _buildSliderSetting(
+                context,
+                '긴 휴식',
+                settings.longBreakMinutes == 0 ? '5초 (테스트)' : '${settings.longBreakMinutes}분',
+                isDeveloperMode ? settings.longBreakMinutes.toDouble() : 
+                  math.max(settings.longBreakMinutes.toDouble(), 10.0),
+                isDeveloperMode ? 0 : 10,
+                30,
+                isDeveloperMode ? 1 : 5,
+                Icons.hotel,
+                isTimerActive ? null : (value) {
+                  ref.read(timerSettingsProvider.notifier).updateSettings(
+                      settings.copyWith(longBreakMinutes: value.round()));
+                },
+                enabled: !isTimerActive,
+              ),
             const Divider(),
 
             // 라운드 수 설정
@@ -129,23 +222,33 @@ class SettingsScreen extends ConsumerWidget {
               8, // 최대값
               1, // 증가값
               Icons.repeat,
-              (value) {
-                ref.read(timerSettingsProvider.notifier).state = 
-                    settings.copyWith(roundsUntilLongBreak: value.round());
+              isTimerActive ? null : (value) {
+                ref.read(timerSettingsProvider.notifier).updateSettings(
+                    settings.copyWith(roundsUntilLongBreak: value.round()));
               },
+              enabled: !isTimerActive,
             ),
             const Divider(),
 
             // 자동 시작 설정
             SwitchListTile(
-              title: const Text('다음 모드 자동 시작'),
-              subtitle: const Text('타이머 완료 후 자동으로 다음 모드 시작'),
+              title: Text(
+                '다음 모드 자동 시작',
+                style: isTimerActive ? TextStyle(color: Colors.grey.shade600) : null,
+              ),
+              subtitle: Text(
+                '타이머 완료 후 자동으로 다음 모드 시작',
+                style: isTimerActive ? TextStyle(color: Colors.grey.shade600) : null,
+              ),
               value: settings.autoStartNext,
-              onChanged: (value) {
-                ref.read(timerSettingsProvider.notifier).state = 
-                    settings.copyWith(autoStartNext: value);
+              onChanged: isTimerActive ? null : (value) {
+                ref.read(timerSettingsProvider.notifier).updateSettings(
+                    settings.copyWith(autoStartNext: value));
               },
-              secondary: const Icon(Icons.play_circle),
+              secondary: Icon(
+                Icons.play_circle,
+                color: isTimerActive ? Colors.grey : null,
+              ),
             ),
           ],
         ),
@@ -163,17 +266,22 @@ class SettingsScreen extends ConsumerWidget {
     double max,
     double divisions,
     IconData icon,
-    ValueChanged<double> onChanged,
-  ) {
+    ValueChanged<double>? onChanged, {
+    bool enabled = true,
+  }) {
     return Column(
       children: [
         ListTile(
-          leading: Icon(icon),
-          title: Text(title),
+          leading: Icon(icon, color: enabled ? null : Colors.grey),
+          title: Text(
+            title,
+            style: enabled ? null : TextStyle(color: Colors.grey.shade600),
+          ),
           trailing: Text(
             value,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
+              color: enabled ? null : Colors.grey.shade600,
             ),
           ),
         ),
@@ -182,7 +290,7 @@ class SettingsScreen extends ConsumerWidget {
           min: min,
           max: max,
           divisions: ((max - min) / divisions).round(),
-          onChanged: onChanged,
+          onChanged: enabled ? onChanged : null,
         ),
       ],
     );
@@ -190,6 +298,9 @@ class SettingsScreen extends ConsumerWidget {
 
   /// 사운드 설정 카드
   Widget _buildSoundSettingsCard(BuildContext context, WidgetRef ref) {
+    final soundSettings = ref.watch(soundSettingsProvider);
+    final notificationSettings = ref.watch(notificationSettingsProvider);
+    
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -198,9 +309,9 @@ class SettingsScreen extends ConsumerWidget {
             SwitchListTile(
               title: const Text('사운드 알림'),
               subtitle: const Text('타이머 완료 시 소리로 알림'),
-              value: true, // 임시값
+              value: soundSettings.soundEnabled,
               onChanged: (value) {
-                // TODO: 사운드 설정 Provider 구현
+                ref.read(soundSettingsProvider.notifier).setSoundEnabled(value);
               },
               secondary: const Icon(Icons.volume_up),
             ),
@@ -208,9 +319,9 @@ class SettingsScreen extends ConsumerWidget {
             SwitchListTile(
               title: const Text('진동 알림'),
               subtitle: const Text('타이머 완료 시 진동으로 알림'),
-              value: true, // 임시값
+              value: soundSettings.vibrationEnabled,
               onChanged: (value) {
-                // TODO: 진동 설정 Provider 구현
+                ref.read(soundSettingsProvider.notifier).setVibrationEnabled(value);
               },
               secondary: const Icon(Icons.vibration),
             ),
@@ -218,9 +329,9 @@ class SettingsScreen extends ConsumerWidget {
             SwitchListTile(
               title: const Text('푸시 알림'),
               subtitle: const Text('앱이 백그라운드에 있을 때도 알림'),
-              value: false, // 임시값
+              value: notificationSettings.notificationEnabled,
               onChanged: (value) {
-                // TODO: 푸시 알림 설정 Provider 구현
+                ref.read(notificationSettingsProvider.notifier).setNotificationEnabled(value);
               },
               secondary: const Icon(Icons.notifications),
             ),
@@ -280,8 +391,114 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  /// 개발자 모드 카드
+  Widget _buildDeveloperModeCard(BuildContext context, WidgetRef ref, TimerSettings settings, bool isTimerActive) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // 개발자 모드 헤더
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.developer_mode, color: Colors.orange.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '개발자 모드 (테스트용)',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () {
+                      // 개발자 모드 비활성화 시 5초 타이머가 설정되어 있으면 기본값으로 복원
+                      if (settings.focusMinutes == 0 || settings.shortBreakMinutes == 0 || settings.longBreakMinutes == 0) {
+                        ref.read(timerSettingsProvider.notifier).updateSettings(
+                          const TimerSettings(), // 기본값으로 복원
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('타이머 설정이 기본값으로 복원되었습니다'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                      ref.read(developerModeProvider.notifier).toggle();
+                    },
+                    child: const Text('비활성화'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 5초 타이머 설정
+            ElevatedButton.icon(
+              onPressed: isTimerActive ? null : () {
+                ref.read(timerSettingsProvider.notifier).updateSettings(
+                  TimerSettings(
+                    focusMinutes: 0, // 5초를 위한 특수값
+                    shortBreakMinutes: 0,
+                    longBreakMinutes: 0,
+                    roundsUntilLongBreak: settings.roundsUntilLongBreak,
+                    autoStartNext: settings.autoStartNext,
+                  ),
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('모든 타이머가 5초로 설정되었습니다 (테스트용)'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.speed),
+              label: const Text('5초 테스트 타이머 설정'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // 기본값 복원
+            ElevatedButton.icon(
+              onPressed: isTimerActive ? null : () {
+                ref.read(timerSettingsProvider.notifier).updateSettings(
+                  const TimerSettings(), // 기본값으로 복원
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('타이머 설정이 기본값으로 복원되었습니다'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.restore),
+              label: const Text('기본값으로 복원'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade400,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 앱 정보 카드
   Widget _buildAppInfoCard(BuildContext context) {
+    final isDeveloperMode = ref.watch(developerModeProvider);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -290,19 +507,47 @@ class SettingsScreen extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.info),
               title: const Text('앱 버전'),
-              subtitle: const Text('1.0.0'),
+              subtitle: Text(isDeveloperMode ? '1.0.0 (개발자 모드)' : '1.0.0'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
-                showAboutDialog(
-                  context: context,
-                  applicationName: 'Fomato',
-                  applicationVersion: '1.0.0',
-                  applicationIcon: const Icon(Icons.eco, size: 48),
-                  children: [
-                    const Text('토마토 농장형 뽀모도로 타이머'),
-                    const Text('25분 집중하여 토마토를 수확하세요!'),
-                  ],
-                );
+                setState(() {
+                  _versionTapCount++;
+                });
+
+                if (_versionTapCount >= 10 && !isDeveloperMode) {
+                  ref.read(developerModeProvider.notifier).toggle();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('🔧 개발자 모드가 활성화되었습니다!'),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                  setState(() {
+                    _versionTapCount = 0;
+                  });
+                } else if (_versionTapCount < 10 && !isDeveloperMode) {
+                  // 힌트 표시 (5번 탭 이후)
+                  if (_versionTapCount >= 5) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('개발자 모드까지 ${10 - _versionTapCount}번 남았습니다'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                } else {
+                  // 일반적인 정보 다이얼로그
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Fomato',
+                    applicationVersion: '1.0.0',
+                    applicationIcon: const Icon(Icons.eco, size: 48),
+                    children: [
+                      const Text('토마토 농장형 뽀모도로 타이머'),
+                      const Text('25분 집중하여 토마토를 수확하세요!'),
+                    ],
+                  );
+                }
               },
             ),
             const Divider(),

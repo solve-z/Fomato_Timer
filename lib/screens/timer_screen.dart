@@ -192,7 +192,7 @@ class TimerScreen extends ConsumerWidget {
         builder: (context, scrollController) => _FarmSelectorBottomSheet(
           scrollController: scrollController,
           onFarmSelected: (farm) {
-            ref.read(selectedFarmProvider.notifier).state = farm;
+            ref.read(selectedFarmProvider.notifier).selectFarm(farm);
             ref.read(timerProvider.notifier).selectFarm(farm.id);
             Navigator.of(context).pop();
           },
@@ -242,18 +242,87 @@ class TimerScreen extends ConsumerWidget {
       );
     }
     
-    // 일시정지 또는 완료: 시작, 정지, 리셋 버튼 표시
-    else {
+    // 완료 상태: 다음 모드 버튼 표시
+    else if (timerState.status == TimerStatus.completed) {
       return Column(
         children: [
-          // 첫 번째 행: 시작 버튼
+          // 완료 메시지
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade300),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  timerState.mode == TimerMode.focus ? '집중 완료! 토마토 수확 🍅' : '휴식 완료!',
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 다음 모드 버튼
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton.icon(
-                onPressed: () => ref.read(timerProvider.notifier).start(),
+                onPressed: () => ref.read(timerProvider.notifier).nextMode(),
+                icon: const Icon(Icons.arrow_forward),
+                label: Text(_getNextModeText(timerState)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade500,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // 리셋 버튼
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _showResetConfirmation(context, ref),
+                icon: const Icon(Icons.refresh),
+                label: const Text('리셋'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey.shade600,
+                  side: BorderSide(color: Colors.grey.shade600),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    
+    // 일시정지 상태: 재시작, 정지, 리셋 버튼 표시
+    else {
+      return Column(
+        children: [
+          // 첫 번째 행: 재시작 버튼
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => ref.read(timerProvider.notifier).resume(),
                 icon: const Icon(Icons.play_arrow),
-                label: const Text('시작'),
+                label: const Text('재시작'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
                   foregroundColor: Colors.white,
@@ -292,6 +361,22 @@ class TimerScreen extends ConsumerWidget {
           ),
         ],
       );
+    }
+  }
+
+  /// 다음 모드 텍스트 가져오기
+  String _getNextModeText(TimerState timerState) {
+    switch (timerState.mode) {
+      case TimerMode.focus:
+        // 집중 완료 후 짧은 휴식 또는 긴 휴식
+        final isLongBreak = timerState.currentRound >= timerState.totalRounds;
+        return isLongBreak ? '긴 휴식 시작' : '짧은 휴식 시작';
+      case TimerMode.shortBreak:
+        return '집중 모드 시작';
+      case TimerMode.longBreak:
+        return '집중 모드 시작';
+      case TimerMode.stopped:
+        return '시작';
     }
   }
 

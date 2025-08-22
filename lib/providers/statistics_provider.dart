@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/statistics.dart';
+import '../services/storage_service.dart';
 
 /// 통계 상태 관리 클래스
 class StatisticsNotifier extends StateNotifier<StatisticsState> {
@@ -7,29 +8,29 @@ class StatisticsNotifier extends StateNotifier<StatisticsState> {
     _loadInitialStats();
   }
 
-  /// 초기 통계 데이터 로드 (나중에 SharedPreferences에서 로드)
-  void _loadInitialStats() {
-    // 예시 데이터 생성
-    final now = DateTime.now();
-    final exampleStats = <DailyStats>[];
-    
-    // 최근 7일간 예시 데이터
-    for (int i = 0; i < 7; i++) {
-      final date = now.subtract(Duration(days: i));
-      exampleStats.add(DailyStats(
-        date: date,
-        tomatoCount: i % 3, // 0-2개 토마토
-        focusMinutes: (i % 3) * 25, // 0, 25, 50분
-        completedSessions: i % 3,
-        farmId: i % 2 == 0 ? 'farm-1' : 'farm-2',
-      ));
+  /// 초기 통계 데이터 로드 (SharedPreferences에서 로드)
+  void _loadInitialStats() async {
+    try {
+      final savedStats = await StorageService.loadStatistics();
+      if (savedStats.isNotEmpty) {
+        state = state.copyWith(allStats: savedStats);
+      } else {
+        // 저장된 통계가 없으면 빈 상태로 시작
+        state = state.copyWith(allStats: <DailyStats>[]);
+      }
+    } catch (e) {
+      // 에러 발생 시 빈 상태로 시작
+      state = state.copyWith(allStats: <DailyStats>[]);
     }
-    
-    state = state.copyWith(allStats: exampleStats);
+  }
+
+  /// 통계 데이터를 저장소에 저장
+  Future<void> _saveStats() async {
+    await StorageService.saveStatistics(state.allStats);
   }
 
   /// 일일 통계 추가/업데이트
-  void addOrUpdateDailyStats(DailyStats newStats) {
+  void addOrUpdateDailyStats(DailyStats newStats) async {
     final existingIndex = state.allStats.indexWhere(
       (stats) => 
           stats.date.year == newStats.date.year &&
@@ -49,6 +50,7 @@ class StatisticsNotifier extends StateNotifier<StatisticsState> {
     }
 
     state = state.copyWith(allStats: updatedStats);
+    await _saveStats();
   }
 
   /// 토마토 수확 기록 (타이머 완료 시 호출)
