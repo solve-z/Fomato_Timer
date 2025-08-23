@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/timer_state.dart';
 import '../services/timer_service.dart';
@@ -10,9 +11,10 @@ import 'statistics_provider.dart';
 import 'settings_provider.dart';
 
 /// 타이머 상태 관리 클래스
-class TimerNotifier extends StateNotifier<TimerState> {
+class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserver {
   TimerNotifier(this.ref) : super(TimerState.initial()) {
     _initializeService();
+    _setupAppLifecycleListener();
   }
 
   final Ref ref;
@@ -20,6 +22,7 @@ class TimerNotifier extends StateNotifier<TimerState> {
   StreamSubscription<TimerState>? _stateSubscription;
   bool _hasHarvestedForCurrentSession = false; // 현재 세션에서 이미 수확했는지 플래그
   bool _hasAutoTransitioned = false; // 현재 완료 상태에서 이미 자동 전환했는지 플래그
+  bool _isAppInBackground = false; // 앱 백그라운드 상태 플래그
 
   /// 서비스 초기화
   void _initializeService() {
@@ -298,10 +301,52 @@ class TimerNotifier extends StateNotifier<TimerState> {
     }
   }
 
+  /// 앱 라이프사이클 리스너 설정
+  void _setupAppLifecycleListener() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// 앱 라이프사이클 상태 변화 감지
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.inactive:
+        // 앱이 백그라운드로 전환됨
+        _isAppInBackground = true;
+        break;
+      case AppLifecycleState.resumed:
+        // 앱이 포그라운드로 복귀함
+        if (_isAppInBackground) {
+          _isAppInBackground = false;
+          _syncWithBackgroundState();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /// 백그라운드 상태와 동기화
+  Future<void> _syncWithBackgroundState() async {
+    try {
+      // 타이머가 실행 중이었다면 백그라운드 상태와 동기화
+      if (state.status == TimerStatus.running || state.status == TimerStatus.paused) {
+        await _timerService?.syncWithBackgroundState();
+      }
+    } catch (e) {
+      // 동기화 실패 시 무시 (앱 기능에 큰 영향 없음)
+    }
+  }
+
   @override
   void dispose() {
     _stateSubscription?.cancel();
     _timerService?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }

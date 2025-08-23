@@ -4,6 +4,7 @@ import 'utils/theme.dart';
 import 'utils/constants.dart';
 import 'widgets/bottom_navigation.dart';
 import 'services/notification_service.dart';
+import 'services/background_service.dart';
 
 /// Fomato 앱의 진입점
 /// 
@@ -14,6 +15,9 @@ void main() async {
   
   // 알림 서비스 초기화
   await NotificationService().initialize();
+  
+  // 백그라운드 서비스 초기화
+  await BackgroundService.instance.initialize();
   
   runApp(const ProviderScope(child: FomatoApp()));
 }

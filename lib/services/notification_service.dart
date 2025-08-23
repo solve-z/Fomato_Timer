@@ -178,7 +178,7 @@ class NotificationService {
     );
   }
 
-  /// 타이머 시작 알림 (백그라운드에서 실행 중임을 알림)
+  /// 타이머 실행 중 알림 (집중시간)
   Future<void> showTimerRunningNotification({
     required String mode,
     required String timeLeft,
@@ -193,8 +193,37 @@ class NotificationService {
 
     await _showNotification(
       id: notificationId,
-      title: '🕐 $mode 중... ($timeLeft)',
-      body: farmName.isNotEmpty ? '$farmName 농장에서 열심히 하고 있습니다!' : '열심히 하고 있습니다!',
+      title: farmName.isNotEmpty ? '🕐 $mode 중 - $farmName' : '🕐 $mode 중',
+      body: timeLeft,
+      channelId: channelId,
+      channelName: channelName,
+      channelDescription: channelDescription,
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true, // 지속적 알림
+      autoCancel: false, // 탭해도 자동 삭제 안됨
+    );
+  }
+
+  /// 휴식시간 실행 중 알림
+  Future<void> showBreakRunningNotification({
+    required String mode,
+    required String timeLeft,
+  }) async {
+    if (!_isInitialized) return;
+
+    const int notificationId = 1003; // 동일한 ID 사용 (기존 알림 대체)
+    const String channelId = 'timer_running';
+    const String channelName = '타이머 실행 중';
+    const String channelDescription = '타이머가 백그라운드에서 실행 중임을 알리는 알림';
+
+    // 휴식시간별 이모지
+    final String emoji = mode.contains('긴') ? '😴' : '😌';
+    
+    await _showNotification(
+      id: notificationId,
+      title: '$emoji $mode 중',
+      body: timeLeft,
       channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,
