@@ -98,7 +98,6 @@ class StorageService {
     required int shortBreakMinutes,
     required int longBreakMinutes,
     required int roundsUntilLongBreak,
-    required bool autoStartNext,
   }) async {
     final prefs = await _prefs;
     final settings = {
@@ -106,7 +105,6 @@ class StorageService {
       'shortBreakMinutes': shortBreakMinutes,
       'longBreakMinutes': longBreakMinutes,
       'roundsUntilLongBreak': roundsUntilLongBreak,
-      'autoStartNext': autoStartNext,
     };
     await prefs.setString(_timerSettingsKey, jsonEncode(settings));
   }

@@ -12,18 +12,22 @@ import 'background_service.dart';
 /// - 4번 집중 후 긴휴식 자동 전환
 /// - 타이머 상태 변화 스트림 제공
 class TimerService {
-  TimerService({
-    int? focusMinutes,
-    int? shortBreakMinutes,
-    int? longBreakMinutes,
-    int? roundsUntilLongBreak,
-  }) : _focusMinutes = focusMinutes ?? AppConstants.defaultFocusMinutes,
-       _shortBreakMinutes =
-           shortBreakMinutes ?? AppConstants.defaultShortBreakMinutes,
-       _longBreakMinutes =
-           longBreakMinutes ?? AppConstants.defaultLongBreakMinutes,
-       _roundsUntilLongBreak =
-           roundsUntilLongBreak ?? AppConstants.defaultRoundsUntilLongBreak;
+  TimerService({int? focusMinutes, int? shortBreakMinutes, int? longBreakMinutes, int? roundsUntilLongBreak})
+    : _focusMinutes = focusMinutes ?? AppConstants.defaultFocusMinutes,
+      _shortBreakMinutes = shortBreakMinutes ?? AppConstants.defaultShortBreakMinutes,
+      _longBreakMinutes = longBreakMinutes ?? AppConstants.defaultLongBreakMinutes,
+      _roundsUntilLongBreak = roundsUntilLongBreak ?? AppConstants.defaultRoundsUntilLongBreak {
+    // 생성자에서 초기 상태 설정 (AppConstants와 동일한 값으로)
+    final initialSeconds = _focusMinutes * 60;
+    _currentState = TimerState(
+      mode: TimerMode.focus,
+      status: TimerStatus.initial,
+      remainingSeconds: initialSeconds,
+      totalSeconds: initialSeconds,
+      currentRound: 1,
+      totalRounds: _roundsUntilLongBreak,
+    );
+  }
 
   final int _focusMinutes;
   final int _shortBreakMinutes;
@@ -31,9 +35,8 @@ class TimerService {
   final int _roundsUntilLongBreak;
 
   Timer? _timer;
-  final StreamController<TimerState> _stateController =
-      StreamController<TimerState>.broadcast();
-  TimerState _currentState = TimerState.initial();
+  final StreamController<TimerState> _stateController = StreamController<TimerState>.broadcast();
+  late TimerState _currentState;
   final NotificationService _notificationService = NotificationService();
   final BackgroundService _backgroundService = BackgroundService.instance;
 
@@ -49,11 +52,7 @@ class TimerService {
   }
 
   /// 알림 콜백 설정
-  void setNotificationCallbacks({
-    String Function()? getFarmName,
-    int Function()? getTomatoCount,
-    bool Function()? isNotificationEnabled,
-  }) {
+  void setNotificationCallbacks({String Function()? getFarmName, int Function()? getTomatoCount, bool Function()? isNotificationEnabled}) {
     _getFarmName = getFarmName;
     _getTomatoCount = getTomatoCount;
     _isNotificationEnabled = isNotificationEnabled;
@@ -66,19 +65,14 @@ class TimerService {
   void start() {
     if (_currentState.status == TimerStatus.running) return;
 
-    _updateState(
-      _currentState.copyWith(
-        status: TimerStatus.running,
-        startTime: DateTime.now(),
-      ),
-    );
+    _updateState(_currentState.copyWith(status: TimerStatus.running, startTime: DateTime.now()));
 
     // 실행 중 알림 시작
     _showRunningNotification();
-    
+
     // 백그라운드 타이머 시작
     _startBackgroundTimer();
-    
+
     _startTicking();
   }
 
@@ -86,10 +80,10 @@ class TimerService {
   void pause() {
     _timer?.cancel();
     _updateState(_currentState.copyWith(status: TimerStatus.paused));
-    
+
     // 실행 중 알림 제거
     _cancelRunningNotification();
-    
+
     // 백그라운드 타이머 중지
     _stopBackgroundTimer();
   }
@@ -99,32 +93,36 @@ class TimerService {
     if (_currentState.status != TimerStatus.paused) return;
 
     _updateState(_currentState.copyWith(status: TimerStatus.running));
-    
+
     // 실행 중 알림 다시 시작
     _showRunningNotification();
-    
+
     // 백그라운드 타이머 재시작
     _startBackgroundTimer();
-    
+
     _startTicking();
   }
 
   /// 타이머 정지 (초기 상태로 리셋)
   void stop() {
     _timer?.cancel();
-    
+
     // 실행 중 알림 제거
     _cancelRunningNotification();
-    
+
     // 백그라운드 타이머 중지
     _stopBackgroundTimer();
-    
-    _updateState(
-      TimerState.initial().copyWith(
-        selectedFarmId: _currentState.selectedFarmId,
-        totalRounds: _roundsUntilLongBreak,
-      ),
-    );
+
+    final initialSeconds = _focusMinutes * 60;
+    _updateState(TimerState(
+      mode: TimerMode.focus,
+      status: TimerStatus.initial,
+      remainingSeconds: initialSeconds,
+      totalSeconds: initialSeconds,
+      currentRound: 1,
+      totalRounds: _roundsUntilLongBreak,
+      selectedFarmId: _currentState.selectedFarmId,
+    ));
   }
 
   /// 타이머 리셋 (현재 모드 유지)
@@ -132,15 +130,7 @@ class TimerService {
     _timer?.cancel();
 
     final seconds = _getSecondsForMode(_currentState.mode);
-    _updateState(
-      _currentState.copyWith(
-        status: TimerStatus.initial,
-        remainingSeconds: seconds,
-        totalSeconds: seconds,
-        startTime: null,
-        endTime: null,
-      ),
-    );
+    _updateState(_currentState.copyWith(status: TimerStatus.initial, remainingSeconds: seconds, totalSeconds: seconds, startTime: null, endTime: null));
   }
 
   /// 농장 선택
@@ -203,32 +193,29 @@ class TimerService {
       final newRemainingSeconds = _currentState.remainingSeconds - 1;
 
       if (newRemainingSeconds > 0) {
-        _updateState(
-          _currentState.copyWith(remainingSeconds: newRemainingSeconds),
-        );
-        
+        _updateState(_currentState.copyWith(remainingSeconds: newRemainingSeconds));
+
         // 실행 중 알림 업데이트 (매초)
         _updateRunningNotification();
+
+        // 10초마다 백그라운드 상태 저장 (더 자주 저장)
+        if (newRemainingSeconds % 10 == 0) {
+          _updateBackgroundState();
+        }
       } else if (newRemainingSeconds == 0) {
         // 0초 상태로 업데이트
         _updateState(_currentState.copyWith(remainingSeconds: 0));
       } else {
         // -1초 (즉, 완료)
         timer.cancel();
-        _updateState(
-          _currentState.copyWith(
-            status: TimerStatus.completed,
-            remainingSeconds: 0,
-            endTime: DateTime.now(),
-          ),
-        );
-        
+        _updateState(_currentState.copyWith(status: TimerStatus.completed, remainingSeconds: 0, endTime: DateTime.now()));
+
         // 실행 중 알림 제거
         _cancelRunningNotification();
-        
+
         // 백그라운드 타이머 중지
         _stopBackgroundTimer();
-        
+
         // 완료 시 알림 전송
         _sendCompletionNotification();
       }
@@ -247,25 +234,16 @@ class TimerService {
       case TimerMode.focus:
         return _focusMinutes == 0 ? 5 : _focusMinutes * 60; // 개발자 모드: 0분 = 5초
       case TimerMode.shortBreak:
-        return _shortBreakMinutes == 0
-            ? 5
-            : _shortBreakMinutes * 60; // 개발자 모드: 0분 = 5초
+        return _shortBreakMinutes == 0 ? 5 : _shortBreakMinutes * 60; // 개발자 모드: 0분 = 5초
       case TimerMode.longBreak:
-        return _longBreakMinutes == 0
-            ? 5
-            : _longBreakMinutes * 60; // 개발자 모드: 0분 = 5초
+        return _longBreakMinutes == 0 ? 5 : _longBreakMinutes * 60; // 개발자 모드: 0분 = 5초
       case TimerMode.stopped:
         return 0;
     }
   }
 
   /// 설정 업데이트 (새 인스턴스 생성 필요)
-  TimerService updateSettings({
-    int? focusMinutes,
-    int? shortBreakMinutes,
-    int? longBreakMinutes,
-    int? roundsUntilLongBreak,
-  }) {
+  TimerService updateSettings({int? focusMinutes, int? shortBreakMinutes, int? longBreakMinutes, int? roundsUntilLongBreak}) {
     final newService = TimerService(
       focusMinutes: focusMinutes ?? _focusMinutes,
       shortBreakMinutes: shortBreakMinutes ?? _shortBreakMinutes,
@@ -278,19 +256,12 @@ class TimerService {
 
     // 현재 상태 복사하되, 초기 상태이거나 완료 상태일 때만 시간 업데이트
     TimerState newState;
-    if (_currentState.status == TimerStatus.initial ||
-        _currentState.status == TimerStatus.completed) {
+    if (_currentState.status == TimerStatus.initial || _currentState.status == TimerStatus.completed) {
       // 초기 상태거나 완료 상태일 때는 새로운 시간으로 업데이트
-      newState = _currentState.copyWith(
-        remainingSeconds: newSeconds,
-        totalSeconds: newSeconds,
-        totalRounds: roundsUntilLongBreak ?? _roundsUntilLongBreak,
-      );
+      newState = _currentState.copyWith(remainingSeconds: newSeconds, totalSeconds: newSeconds, totalRounds: roundsUntilLongBreak ?? _roundsUntilLongBreak);
     } else {
       // 실행 중이거나 일시정지 상태일 때는 시간은 그대로 두고 라운드만 업데이트
-      newState = _currentState.copyWith(
-        totalRounds: roundsUntilLongBreak ?? _roundsUntilLongBreak,
-      );
+      newState = _currentState.copyWith(totalRounds: roundsUntilLongBreak ?? _roundsUntilLongBreak);
     }
 
     newService._updateState(newState);
@@ -323,16 +294,13 @@ class TimerService {
         // 집중 완료 알림
         final farmName = _getFarmName?.call() ?? '';
         final tomatoCount = _getTomatoCount?.call() ?? 0;
-        
-        await _notificationService.showFocusCompleteNotification(
-          farmName: farmName.isEmpty ? '농장' : farmName,
-          tomatoCount: tomatoCount,
-        );
+
+        await _notificationService.showFocusCompleteNotification(farmName: farmName.isEmpty ? '농장' : farmName, tomatoCount: tomatoCount);
       } else {
         // 휴식 완료 알림
         final isLongBreak = _currentState.mode == TimerMode.longBreak;
         String nextMode;
-        
+
         if (isLongBreak) {
           nextMode = '집중';
         } else {
@@ -343,11 +311,8 @@ class TimerService {
             nextMode = '집중';
           }
         }
-        
-        await _notificationService.showBreakCompleteNotification(
-          isLongBreak: isLongBreak,
-          nextMode: nextMode,
-        );
+
+        await _notificationService.showBreakCompleteNotification(isLongBreak: isLongBreak, nextMode: nextMode);
       }
     } catch (e) {
       // 알림 전송 실패 시 무시 (앱 기능에는 영향 없음)
@@ -366,20 +331,13 @@ class TimerService {
       final mode = _getModeText(_currentState.mode);
       final timeLeft = _formatTime(_currentState.remainingSeconds);
       final farmName = _getFarmName?.call() ?? '';
-      
+
       if (_currentState.mode == TimerMode.focus) {
         // 집중시간 - 농장명 포함
-        _notificationService.showTimerRunningNotification(
-          mode: mode,
-          timeLeft: timeLeft,
-          farmName: farmName,
-        );
+        _notificationService.showTimerRunningNotification(mode: mode, timeLeft: timeLeft, farmName: farmName);
       } else {
         // 휴식시간 - 농장명 제외, 전용 알림
-        _notificationService.showBreakRunningNotification(
-          mode: mode,
-          timeLeft: timeLeft,
-        );
+        _notificationService.showBreakRunningNotification(mode: mode, timeLeft: timeLeft);
       }
     } catch (e) {
       if (kDebugMode) {
@@ -397,20 +355,13 @@ class TimerService {
       final mode = _getModeText(_currentState.mode);
       final timeLeft = _formatTime(_currentState.remainingSeconds);
       final farmName = _getFarmName?.call() ?? '';
-      
+
       if (_currentState.mode == TimerMode.focus) {
         // 집중시간 - 농장명 포함
-        _notificationService.showTimerRunningNotification(
-          mode: mode,
-          timeLeft: timeLeft,
-          farmName: farmName,
-        );
+        _notificationService.showTimerRunningNotification(mode: mode, timeLeft: timeLeft, farmName: farmName);
       } else {
         // 휴식시간 - 농장명 제외, 전용 알림
-        _notificationService.showBreakRunningNotification(
-          mode: mode,
-          timeLeft: timeLeft,
-        );
+        _notificationService.showBreakRunningNotification(mode: mode, timeLeft: timeLeft);
       }
     } catch (e) {
       if (kDebugMode) {
@@ -455,10 +406,7 @@ class TimerService {
   void _startBackgroundTimer() {
     try {
       final farmName = _getFarmName?.call() ?? '';
-      _backgroundService.startBackgroundTimer(
-        timerState: _currentState,
-        farmName: farmName,
-      );
+      _backgroundService.startBackgroundTimer(timerState: _currentState, farmName: farmName);
     } catch (e) {
       if (kDebugMode) {
         print('Failed to start background timer: $e');
@@ -477,14 +425,30 @@ class TimerService {
     }
   }
 
+  /// 백그라운드 상태 업데이트 (주기적 저장)
+  void _updateBackgroundState() {
+    try {
+      final farmName = _getFarmName?.call() ?? '';
+      _backgroundService.startBackgroundTimer(timerState: _currentState, farmName: farmName);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to update background state: $e');
+      }
+    }
+  }
+
   /// 앱 포그라운드 복귀 시 타이머 상태 동기화
   Future<void> syncWithBackgroundState() async {
     try {
       final restoredState = await _backgroundService.restoreTimerState();
       if (restoredState != null) {
+        if (kDebugMode) {
+          print('Restoring timer state: ${restoredState.status}, ${restoredState.remainingSeconds}s');
+        }
+
         // 백그라운드에서 복원된 상태로 동기화
         _updateState(restoredState);
-        
+
         // 타이머가 완료되었다면 완료 처리
         if (restoredState.status == TimerStatus.completed) {
           _sendCompletionNotification();
@@ -492,6 +456,10 @@ class TimerService {
           // 여전히 실행 중이라면 포그라운드 타이머 재시작
           _showRunningNotification();
           _startTicking();
+        }
+      } else {
+        if (kDebugMode) {
+          print('No background timer state found');
         }
       }
     } catch (e) {

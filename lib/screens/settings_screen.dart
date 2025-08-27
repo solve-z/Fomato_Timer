@@ -233,28 +233,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               },
               enabled: !isTimerActive,
             ),
-            const Divider(),
-
-            // 자동 시작 설정
-            SwitchListTile(
-              title: Text(
-                '다음 모드 자동 시작',
-                style: isTimerActive ? TextStyle(color: Colors.grey.shade600) : null,
-              ),
-              subtitle: Text(
-                '타이머 완료 후 자동으로 다음 모드 시작',
-                style: isTimerActive ? TextStyle(color: Colors.grey.shade600) : null,
-              ),
-              value: settings.autoStartNext,
-              onChanged: isTimerActive ? null : (value) {
-                ref.read(timerSettingsProvider.notifier).updateSettings(
-                    settings.copyWith(autoStartNext: value));
-              },
-              secondary: Icon(
-                Icons.play_circle,
-                color: isTimerActive ? Colors.grey : null,
-              ),
-            ),
           ],
         ),
       ),
@@ -494,7 +472,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     shortBreakMinutes: 0,
                     longBreakMinutes: 0,
                     roundsUntilLongBreak: settings.roundsUntilLongBreak,
-                    autoStartNext: settings.autoStartNext,
                   ),
                 );
                 ScaffoldMessenger.of(context).showSnackBar(

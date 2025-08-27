@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/timer_state.dart';
@@ -21,7 +22,6 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
   TimerService? _timerService;
   StreamSubscription<TimerState>? _stateSubscription;
   bool _hasHarvestedForCurrentSession = false; // 현재 세션에서 이미 수확했는지 플래그
-  bool _hasAutoTransitioned = false; // 현재 완료 상태에서 이미 자동 전환했는지 플래그
   bool _isAppInBackground = false; // 앱 백그라운드 상태 플래그
 
   /// 서비스 초기화
@@ -45,10 +45,8 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
       (newState) {
         state = newState;
 
-        // 타이머 완료 시 자동 전환 처리
-        if (newState.status == TimerStatus.completed && !_hasAutoTransitioned) {
-          _hasAutoTransitioned = true; // 자동 전환 시작 플래그 설정
-
+        // 타이머 완료 시 처리 (자동 시작 없이 다음 모드로만 전환)
+        if (newState.status == TimerStatus.completed) {
           // 집중 모드 완료 시 토마토 수확 (한 번만 실행)
           if (newState.mode == TimerMode.focus &&
               !_hasHarvestedForCurrentSession) {
@@ -56,42 +54,18 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
             _harvestTomato();
           }
 
-          try {
-            final settings = ref.read(timerSettingsProvider);
-            if (settings.autoStartNext) {
-              // 모드에 따라 다른 전환 시간 적용
-              final delaySeconds =
-                  newState.mode == TimerMode.focus
-                      ? 2
-                      : 1; // 집중 완료 시 조금 더 오래 표시
-
-              Future.delayed(Duration(seconds: delaySeconds), () {
-                _timerService?.nextMode(); // 다음 모드로 전환
-                _hasHarvestedForCurrentSession = false; // 다음 세션을 위해 플래그 리셋
-                _hasAutoTransitioned = false; // 자동 전환 완료 플래그 리셋
-
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  _timerService?.start(); // 새 모드 시작
-                });
-              });
-            } else {
-              // 자동 시작이 꺼져있으면 다음 모드로만 전환
-              Future.delayed(const Duration(seconds: 1), () {
-                _timerService?.nextMode();
-                _hasHarvestedForCurrentSession = false;
-                _hasAutoTransitioned = false; // 자동 전환 완료 플래그 리셋
-              });
-            }
-          } catch (e) {
-            _hasAutoTransitioned = false; // 에러 시 플래그 리셋
-          }
+          // 다음 모드로 전환 후 정지 상태로 대기
+          Future.delayed(const Duration(seconds: 1), () {
+            _timerService?.nextMode();
+            _hasHarvestedForCurrentSession = false; // 다음 세션을 위해 플래그 리셋
+          });
         }
       },
       onError: (error) {},
       onDone: () {},
     );
 
-    // 설정이 로드되면 타이머 서비스 업데이트 (좀 더 여유있게 대기)
+    // 설정 로드 및 백그라운드 상태 복원
     Future.delayed(const Duration(milliseconds: 500), () {
       try {
         final settings = ref.read(timerSettingsProvider);
@@ -99,6 +73,9 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
       } catch (e) {
         // 설정 로드 실패 시 기본 설정 유지
       }
+      
+      // 앱 시작시 백그라운드 상태 자동 확인
+      _syncWithBackgroundState();
     });
   }
 
@@ -114,7 +91,6 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
   /// 타이머 시작
   void start() {
     _hasHarvestedForCurrentSession = false; // 새 세션 시작 시 플래그 리셋
-    _hasAutoTransitioned = false; // 새 세션 시작 시 자동 전환 플래그 리셋
     _timerService?.start();
   }
 
@@ -155,7 +131,6 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
 
     // 플래그 리셋 (다음 세션을 위해)
     _hasHarvestedForCurrentSession = false;
-    _hasAutoTransitioned = false;
   }
 
   /// 토마토 수확 처리
@@ -222,11 +197,8 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
         (newState) {
           state = newState;
 
-          // 타이머 완료 시 자동 전환 처리
-          if (newState.status == TimerStatus.completed &&
-              !_hasAutoTransitioned) {
-            _hasAutoTransitioned = true; // 자동 전환 시작 플래그 설정
-
+          // 타이머 완료 시 처리 (자동 시작 없이 다음 모드로만 전환)
+          if (newState.status == TimerStatus.completed) {
             // 집중 모드 완료 시 토마토 수확 (한 번만 실행)
             if (newState.mode == TimerMode.focus &&
                 !_hasHarvestedForCurrentSession) {
@@ -234,35 +206,11 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
               _harvestTomato();
             }
 
-            try {
-              final settings = ref.read(timerSettingsProvider);
-              if (settings.autoStartNext) {
-                // 모드에 따라 다른 전환 시간 적용
-                final delaySeconds =
-                    newState.mode == TimerMode.focus
-                        ? 2
-                        : 1; // 집중 완료 시 조금 더 오래 표시
-
-                Future.delayed(Duration(seconds: delaySeconds), () {
-                  _timerService?.nextMode(); // 다음 모드로 전환
-                  _hasHarvestedForCurrentSession = false; // 다음 세션을 위해 플래그 리셋
-                  _hasAutoTransitioned = false; // 자동 전환 완료 플래그 리셋
-
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    _timerService?.start(); // 새 모드 시작
-                  });
-                });
-              } else {
-                // 자동 시작이 꺼져있으면 다음 모드로만 전환
-                Future.delayed(const Duration(seconds: 1), () {
-                  _timerService?.nextMode();
-                  _hasHarvestedForCurrentSession = false;
-                  _hasAutoTransitioned = false; // 자동 전환 완료 플래그 리셋
-                });
-              }
-            } catch (e) {
-              _hasAutoTransitioned = false; // 에러 시 플래그 리셋
-            }
+            // 다음 모드로 전환 후 정지 상태로 대기
+            Future.delayed(const Duration(seconds: 1), () {
+              _timerService?.nextMode();
+              _hasHarvestedForCurrentSession = false; // 다음 세션을 위해 플래그 리셋
+            });
           }
         },
         onError: (error) {},
@@ -330,15 +278,19 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
     }
   }
 
-  /// 백그라운드 상태와 동기화
+  /// 백그라운드 상태와 동기화 (무조건 실행)
   Future<void> _syncWithBackgroundState() async {
     try {
-      // 타이머가 실행 중이었다면 백그라운드 상태와 동기화
-      if (state.status == TimerStatus.running || state.status == TimerStatus.paused) {
-        await _timerService?.syncWithBackgroundState();
+      // 항상 백그라운드 상태 확인 (앱 강제 종료 후 재시작 대응)
+      await _timerService?.syncWithBackgroundState();
+      
+      if (kDebugMode) {
+        print('Background state sync completed');
       }
     } catch (e) {
-      // 동기화 실패 시 무시 (앱 기능에 큰 영향 없음)
+      if (kDebugMode) {
+        print('Failed to sync with background state: $e');
+      }
     }
   }
 
@@ -376,14 +328,12 @@ class TimerSettings {
   final int shortBreakMinutes; // 짧은 휴식 시간 (분)
   final int longBreakMinutes; // 긴 휴식 시간 (분)
   final int roundsUntilLongBreak; // 긴 휴식까지 라운드 수
-  final bool autoStartNext; // 다음 모드 자동 시작
 
   const TimerSettings({
     this.focusMinutes = AppConstants.defaultFocusMinutes,
     this.shortBreakMinutes = AppConstants.defaultShortBreakMinutes,
     this.longBreakMinutes = AppConstants.defaultLongBreakMinutes,
     this.roundsUntilLongBreak = AppConstants.defaultRoundsUntilLongBreak,
-    this.autoStartNext = AppConstants.defaultAutoStartNext,
   });
 
   TimerSettings copyWith({
@@ -391,14 +341,12 @@ class TimerSettings {
     int? shortBreakMinutes,
     int? longBreakMinutes,
     int? roundsUntilLongBreak,
-    bool? autoStartNext,
   }) {
     return TimerSettings(
       focusMinutes: focusMinutes ?? this.focusMinutes,
       shortBreakMinutes: shortBreakMinutes ?? this.shortBreakMinutes,
       longBreakMinutes: longBreakMinutes ?? this.longBreakMinutes,
       roundsUntilLongBreak: roundsUntilLongBreak ?? this.roundsUntilLongBreak,
-      autoStartNext: autoStartNext ?? this.autoStartNext,
     );
   }
 }
@@ -428,9 +376,6 @@ class TimerSettingsNotifier extends StateNotifier<TimerSettings> {
           roundsUntilLongBreak:
               savedSettings['roundsUntilLongBreak'] ??
               AppConstants.defaultRoundsUntilLongBreak,
-          autoStartNext:
-              savedSettings['autoStartNext'] ??
-              AppConstants.defaultAutoStartNext,
         );
       }
     } catch (e) {
@@ -461,7 +406,6 @@ class TimerSettingsNotifier extends StateNotifier<TimerSettings> {
       shortBreakMinutes: newSettings.shortBreakMinutes,
       longBreakMinutes: newSettings.longBreakMinutes,
       roundsUntilLongBreak: newSettings.roundsUntilLongBreak,
-      autoStartNext: newSettings.autoStartNext,
     );
   }
 }

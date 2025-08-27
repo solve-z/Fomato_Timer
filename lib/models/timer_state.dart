@@ -1,3 +1,5 @@
+import '../utils/constants.dart';
+
 /// 타이머 상태 열거형
 enum TimerMode {
   focus,      // 집중 모드 (25분)
@@ -42,13 +44,13 @@ class TimerState {
 
   /// 초기 타이머 상태
   factory TimerState.initial() {
-    return const TimerState(
+    return TimerState(
       mode: TimerMode.focus,
       status: TimerStatus.initial,
-      remainingSeconds: 25 * 60, // 25분
-      totalSeconds: 25 * 60,
+      remainingSeconds: AppConstants.defaultFocusMinutes * 60,
+      totalSeconds: AppConstants.defaultFocusMinutes * 60,
       currentRound: 1,
-      totalRounds: 4,
+      totalRounds: AppConstants.defaultRoundsUntilLongBreak,
     );
   }
 

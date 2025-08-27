@@ -6,18 +6,13 @@ class AppConstants {
   static const String appName = 'Fomato';
   static const String appDescription = '토마토 농장형 뽀모도로 앱';
   static const String appVersion = '1.0.0';
-  
+
   // 타이머 기본값
   static const int defaultFocusMinutes = 25;
   static const int defaultShortBreakMinutes = 5;
   static const int defaultLongBreakMinutes = 15;
   static const int defaultRoundsUntilLongBreak = 4;
-  static const bool defaultAutoStartNext = true;
-  
-  // 비즈니스 규칙
-  static const int tomatoPerFocusSession = 1;  // 25분 집중 = 토마토 1개
-  static const int minutesPerTomato = 25;      // 토마토 1개 = 25분
-  
+
   // 저장소 키
   static const String farmsKey = 'farms';
   static const String statisticsKey = 'statistics';
@@ -26,7 +21,7 @@ class AppConstants {
   static const String soundEnabledKey = 'sound_enabled';
   static const String vibrationEnabledKey = 'vibration_enabled';
   static const String notificationEnabledKey = 'notification_enabled';
-  
+
   // 농장 기본 색상 팔레트
   static const List<String> farmColors = [
     '#4CAF50', // 녹색
@@ -38,7 +33,7 @@ class AppConstants {
     '#FF5722', // 깊은 주황색
     '#607D8B', // 청회색
   ];
-  
+
   // 타이머 설정 범위
   static const int minFocusMinutes = 15;
   static const int maxFocusMinutes = 60;
@@ -67,14 +62,14 @@ class AppSizes {
   static const double buttonBorderRadius = 12.0;
   static const double cardBorderRadius = 16.0;
   static const double inputBorderRadius = 10.0;
-  
+
   static const double paddingSmall = 8.0;
   static const double paddingMedium = 16.0;
   static const double paddingLarge = 24.0;
-  
+
   static const double iconSize = 24.0;
   static const double iconSizeLarge = 32.0;
-  
+
   static const double elevationLow = 2.0;
   static const double elevationNone = 0.0;
 }
@@ -85,25 +80,25 @@ class AppTextStyles {
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
   );
-  
+
   static const TextStyle h2 = TextStyle(
     fontSize: 24,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
   );
-  
+
   static const TextStyle body = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
   );
-  
+
   static const TextStyle caption = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
   );
-  
+
   static const TextStyle button = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w600,
@@ -117,7 +112,6 @@ class AppDurations {
   static const Duration animationSlow = Duration(milliseconds: 500);
 }
 
-
 class TimerTexts {
   static const Map<TimerMode, String> modeTexts = {
     TimerMode.focus: '집중 시간',
@@ -129,9 +123,9 @@ class TimerTexts {
 
 class TimerColors {
   static const Map<TimerMode, Color> modeColors = {
-    TimerMode.focus: Color(0xFFEF5350),        // 집중: 빨간색
-    TimerMode.shortBreak: Color(0xFF66BB6A),   // 짧은 휴식: 녹색
-    TimerMode.longBreak: Color(0xFF42A5F5),    // 긴 휴식: 파란색
-    TimerMode.stopped: Color(0xFF9E9E9E),      // 정지: 회색
+    TimerMode.focus: Color(0xFFEF5350), // 집중: 빨간색
+    TimerMode.shortBreak: Color(0xFF66BB6A), // 짧은 휴식: 녹색
+    TimerMode.longBreak: Color(0xFF42A5F5), // 긴 휴식: 파란색
+    TimerMode.stopped: Color(0xFF9E9E9E), // 정지: 회색
   };
 }

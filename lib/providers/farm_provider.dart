@@ -20,16 +20,8 @@ class FarmListNotifier extends StateNotifier<List<Farm>> {
         final defaultFarms = [
           Farm(
             id: 'farm-1',
-            name: 'Flutter 공부',
+            name: '할일',
             color: '#4CAF50',
-            tomatoCount: 0,
-            createdAt: now,
-            updatedAt: now,
-          ),
-          Farm(
-            id: 'farm-2',
-            name: '운동하기',
-            color: '#2196F3',
             tomatoCount: 0,
             createdAt: now,
             updatedAt: now,
@@ -60,23 +52,24 @@ class FarmListNotifier extends StateNotifier<List<Farm>> {
       createdAt: now,
       updatedAt: now,
     );
-    
+
     state = [...state, newFarm];
     await _saveFarms();
   }
 
   /// 농장 수정
   void updateFarm(String farmId, {String? name, String? color}) async {
-    state = state.map((farm) {
-      if (farm.id == farmId) {
-        return farm.copyWith(
-          name: name,
-          color: color,
-          updatedAt: DateTime.now(),
-        );
-      }
-      return farm;
-    }).toList();
+    state =
+        state.map((farm) {
+          if (farm.id == farmId) {
+            return farm.copyWith(
+              name: name,
+              color: color,
+              updatedAt: DateTime.now(),
+            );
+          }
+          return farm;
+        }).toList();
     await _saveFarms();
   }
 
@@ -88,12 +81,13 @@ class FarmListNotifier extends StateNotifier<List<Farm>> {
 
   /// 토마토 수확 (집중 시간 완료 시)
   void harvestTomato(String farmId) async {
-    state = state.map((farm) {
-      if (farm.id == farmId) {
-        return farm.addTomato();
-      }
-      return farm;
-    }).toList();
+    state =
+        state.map((farm) {
+          if (farm.id == farmId) {
+            return farm.addTomato();
+          }
+          return farm;
+        }).toList();
     await _saveFarms();
   }
 
@@ -108,7 +102,9 @@ class FarmListNotifier extends StateNotifier<List<Farm>> {
 }
 
 /// 농장 목록 Provider
-final farmListProvider = StateNotifierProvider<FarmListNotifier, List<Farm>>((ref) {
+final farmListProvider = StateNotifierProvider<FarmListNotifier, List<Farm>>((
+  ref,
+) {
   return FarmListNotifier();
 });
 
@@ -125,18 +121,19 @@ class SelectedFarmNotifier extends StateNotifier<Farm?> {
     try {
       // 농장 목록이 로드될 때까지 잠시 대기
       await Future.delayed(const Duration(milliseconds: 50));
-      
+
       final selectedFarmId = await StorageService.loadSelectedFarmId();
       final farmList = ref.read(farmListProvider);
-      
+
       if (selectedFarmId != null && farmList.isNotEmpty) {
-        final selectedFarm = farmList.where((farm) => farm.id == selectedFarmId).firstOrNull;
+        final selectedFarm =
+            farmList.where((farm) => farm.id == selectedFarmId).firstOrNull;
         if (selectedFarm != null) {
           state = selectedFarm;
           return;
         }
       }
-      
+
       // 저장된 농장이 없거나 유효하지 않으면 첫 번째 농장 선택
       if (farmList.isNotEmpty) {
         state = farmList.first;
@@ -177,7 +174,8 @@ class SelectedFarmNotifier extends StateNotifier<Farm?> {
   void updateFromFarmList(List<Farm> farmList) {
     if (state != null) {
       // 현재 선택된 농장이 여전히 존재하는지 확인
-      final currentFarm = farmList.where((farm) => farm.id == state!.id).firstOrNull;
+      final currentFarm =
+          farmList.where((farm) => farm.id == state!.id).firstOrNull;
       if (currentFarm != null) {
         // 농장 데이터 업데이트 (토마토 수확 등)
         state = currentFarm;
@@ -196,16 +194,18 @@ class SelectedFarmNotifier extends StateNotifier<Farm?> {
 }
 
 /// 선택된 농장 Provider
-final selectedFarmProvider = StateNotifierProvider<SelectedFarmNotifier, Farm?>((ref) {
-  final notifier = SelectedFarmNotifier(ref);
-  
-  // 농장 목록 변경 시 선택된 농장 업데이트
-  ref.listen<List<Farm>>(farmListProvider, (previous, next) {
-    notifier.updateFromFarmList(next);
-  });
-  
-  return notifier;
-});
+final selectedFarmProvider = StateNotifierProvider<SelectedFarmNotifier, Farm?>(
+  (ref) {
+    final notifier = SelectedFarmNotifier(ref);
+
+    // 농장 목록 변경 시 선택된 농장 업데이트
+    ref.listen<List<Farm>>(farmListProvider, (previous, next) {
+      notifier.updateFromFarmList(next);
+    });
+
+    return notifier;
+  },
+);
 
 /// 선택된 농장 ID Provider (편의를 위한)
 final selectedFarmIdProvider = Provider<String?>((ref) {

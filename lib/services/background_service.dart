@@ -43,10 +43,19 @@ class BackgroundService {
       // 백그라운드 실행 권한 확인 및 활성화
       final hasPermission = await FlutterBackground.hasPermissions;
       if (!hasPermission) {
-        await FlutterBackground.initialize(androidConfig: backgroundConfig);
+        final initialized = await FlutterBackground.initialize(androidConfig: backgroundConfig);
+        if (!initialized) {
+          if (kDebugMode) {
+            print('Failed to initialize flutter_background');
+          }
+          return false;
+        }
       }
       
       // 초기화 완료 (flutter_background만 사용)
+      if (kDebugMode) {
+        print('BackgroundService initialized successfully');
+      }
       
       _isInitialized = true;
       return true;
@@ -72,16 +81,29 @@ class BackgroundService {
       // 백그라운드 실행 활성화
       if (!_isBackgroundEnabled) {
         _isBackgroundEnabled = await FlutterBackground.enableBackgroundExecution();
-        if (!_isBackgroundEnabled) return false;
+        if (!_isBackgroundEnabled) {
+          if (kDebugMode) {
+            print('Failed to enable background execution');
+          }
+          return false;
+        }
+        if (kDebugMode) {
+          print('Background execution enabled successfully');
+        }
       }
       
       // 타이머 상태를 SharedPreferences에 저장
       await _saveTimerState(timerState, farmName);
       
       // 15초마다 알림 업데이트 (앱이 살아있을 때만)
+      _notificationUpdateTimer?.cancel(); // 기존 타이머 정리
       _notificationUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
         _updateNotificationInBackground();
       });
+      
+      if (kDebugMode) {
+        print('Background timer started successfully');
+      }
       
       return true;
     } catch (e) {
