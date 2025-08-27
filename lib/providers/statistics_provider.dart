@@ -97,6 +97,22 @@ class StatisticsNotifier extends StateNotifier<StatisticsState> {
     state = state.copyWith(selectedFarmId: farmId);
   }
 
+  /// 오늘 수확한 총 토마토 개수 반환
+  int getTodayTotalTomatoCount() {
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    
+    // 오늘 날짜의 모든 농장 통계 합계
+    final todayStats = state.allStats.where(
+      (stats) => 
+          stats.date.year == todayOnly.year &&
+          stats.date.month == todayOnly.month &&
+          stats.date.day == todayOnly.day,
+    );
+    
+    return todayStats.fold(0, (sum, stats) => sum + stats.tomatoCount);
+  }
+
   /// 선택된 월 변경
   void selectMonth(DateTime month) {
     state = state.copyWith(selectedMonth: month);

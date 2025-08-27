@@ -143,7 +143,7 @@ class NotificationService {
     await _showNotification(
       id: notificationId,
       title: '🍅 집중 완료!',
-      body: '$farmName에서 토마토 1개를 수확했습니다! (총 ${tomatoCount + 1}개)',
+      body: '$farmName에서 토마토를 수확했습니다! (오늘 총 ${tomatoCount + 1}개)',
       channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,

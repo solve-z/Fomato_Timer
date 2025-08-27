@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/timer_state.dart';
 import '../services/timer_service.dart';
 import '../services/storage_service.dart';
+import '../services/notification_service.dart';
 import '../utils/constants.dart';
 import '../models/farm.dart';
 import 'farm_provider.dart';
@@ -45,7 +46,7 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
       (newState) {
         state = newState;
 
-        // 타이머 완료 시 처리 (자동 시작 없이 다음 모드로만 전환)
+        // 타이머 완료 시 처리 (토마토 수확만 하고 자동 전환 안함)
         if (newState.status == TimerStatus.completed) {
           // 집중 모드 완료 시 토마토 수확 (한 번만 실행)
           if (newState.mode == TimerMode.focus &&
@@ -53,12 +54,8 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
             _hasHarvestedForCurrentSession = true;
             _harvestTomato();
           }
-
-          // 다음 모드로 전환 후 정지 상태로 대기
-          Future.delayed(const Duration(seconds: 1), () {
-            _timerService?.nextMode();
-            _hasHarvestedForCurrentSession = false; // 다음 세션을 위해 플래그 리셋
-          });
+          
+          // 플래그 리셋은 사용자가 수동으로 다음 모드로 넘어갈 때 처리
         }
       },
       onError: (error) {},
@@ -83,7 +80,6 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
   void _setupNotificationCallbacks() {
     _timerService?.setNotificationCallbacks(
       getFarmName: () => _getSelectedFarmName(),
-      getTomatoCount: () => _getSelectedFarmTomatoCount(),
       isNotificationEnabled: () => _isNotificationEnabled(),
     );
   }
@@ -121,20 +117,14 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
 
   /// 다음 모드로 전환
   void nextMode() {
-    final previousMode = state.mode;
     _timerService?.nextMode();
-
-    // 집중 모드 완료 시 토마토 수확 (수동 전환)
-    if (previousMode == TimerMode.focus) {
-      _harvestTomato();
-    }
 
     // 플래그 리셋 (다음 세션을 위해)
     _hasHarvestedForCurrentSession = false;
   }
 
   /// 토마토 수확 처리
-  void _harvestTomato() {
+  void _harvestTomato() async {
     final farmId = state.selectedFarmId;
     final currentSettings = ref.read(timerSettingsProvider);
 
@@ -167,6 +157,34 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
                     : currentSettings.focusMinutes,
           );
     }
+
+    // 토마토 수확 완료 후 알림 전송
+    await _sendFocusCompleteNotification();
+  }
+
+  /// 집중 완료 알림 전송
+  Future<void> _sendFocusCompleteNotification() async {
+    try {
+      // 알림 설정 확인
+      if (!_isNotificationEnabled()) return;
+
+      // 농장 이름 가져오기
+      final farmName = _getSelectedFarmName();
+      
+      // 오늘 수확한 총 토마토 개수 가져오기 (방금 수확한 것 포함)
+      final todayTotalCount = ref.read(statisticsProvider.notifier).getTodayTotalTomatoCount();
+
+      // 알림 전송
+      final notificationService = NotificationService();
+      await notificationService.showFocusCompleteNotification(
+        farmName: farmName.isEmpty ? '농장' : farmName,
+        tomatoCount: todayTotalCount - 1, // -1을 해서 방금 수확한 것 제외하고 이전까지의 개수를 전달
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to send focus complete notification: $e');
+      }
+    }
   }
 
   /// 설정 업데이트
@@ -197,7 +215,7 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
         (newState) {
           state = newState;
 
-          // 타이머 완료 시 처리 (자동 시작 없이 다음 모드로만 전환)
+          // 타이머 완료 시 처리 (토마토 수확만 하고 자동 전환 안함)
           if (newState.status == TimerStatus.completed) {
             // 집중 모드 완료 시 토마토 수확 (한 번만 실행)
             if (newState.mode == TimerMode.focus &&
@@ -205,12 +223,8 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
               _hasHarvestedForCurrentSession = true;
               _harvestTomato();
             }
-
-            // 다음 모드로 전환 후 정지 상태로 대기
-            Future.delayed(const Duration(seconds: 1), () {
-              _timerService?.nextMode();
-              _hasHarvestedForCurrentSession = false; // 다음 세션을 위해 플래그 리셋
-            });
+            
+            // 플래그 리셋은 사용자가 수동으로 다음 모드로 넘어갈 때 처리
           }
         },
         onError: (error) {},
@@ -229,15 +243,6 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
     }
   }
 
-  /// 알림 콜백: 선택된 농장의 토마토 개수 반환
-  int _getSelectedFarmTomatoCount() {
-    try {
-      final selectedFarm = ref.read(selectedFarmProvider);
-      return selectedFarm?.tomatoCount ?? 0;
-    } catch (e) {
-      return 0;
-    }
-  }
 
   /// 알림 콜백: 알림 활성화 여부 반환
   bool _isNotificationEnabled() {

@@ -6,14 +6,14 @@ import 'package:flutter_background/flutter_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/timer_state.dart';
 import '../utils/constants.dart';
-import 'notification_service.dart';
 
-/// 백그라운드 타이머 실행 서비스
+/// 단순화된 백그라운드 서비스 (단일 시간 기반 시스템)
 ///
-/// 앱이 백그라운드에 있을 때도 타이머를 계속 실행하기 위한 서비스입니다.
-/// flutter_background를 사용하여 앱 종료 방지 + 시간 기반 계산으로 정확한 타이머 구현
+/// 핵심 기능만 담당:
+/// 1. 타이머 상태 저장/복원 (시작시간, 총시간 등 핵심 데이터만)
+/// 2. flutter_background를 통한 앱 백그라운드 실행 관리
 class BackgroundService {
-  static const String _timerStateKey = 'background_timer_state';
+  static const String _timerDataKey = 'unified_timer_data';
   
   static BackgroundService? _instance;
   static BackgroundService get instance => _instance ??= BackgroundService._();
@@ -22,7 +22,7 @@ class BackgroundService {
   
   bool _isInitialized = false;
   bool _isBackgroundEnabled = false;
-  Timer? _notificationUpdateTimer;
+  // 알림은 TimerService에서 직접 관리하므로 여기서는 제거
   
   /// 백그라운드 서비스 초기화
   Future<bool> initialize() async {
@@ -67,7 +67,7 @@ class BackgroundService {
     }
   }
   
-  /// 백그라운드 타이머 시작
+  /// 백그라운드 실행 시작 (단순화됨)
   Future<bool> startBackgroundTimer({
     required TimerState timerState,
     required String? farmName,
@@ -92,14 +92,8 @@ class BackgroundService {
         }
       }
       
-      // 타이머 상태를 SharedPreferences에 저장
-      await _saveTimerState(timerState, farmName);
-      
-      // 15초마다 알림 업데이트 (앱이 살아있을 때만)
-      _notificationUpdateTimer?.cancel(); // 기존 타이머 정리
-      _notificationUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-        _updateNotificationInBackground();
-      });
+      // 핵심 데이터만 저장
+      await saveTimerState(timerState);
       
       if (kDebugMode) {
         print('Background timer started successfully');
@@ -114,13 +108,9 @@ class BackgroundService {
     }
   }
   
-  /// 백그라운드 타이머 중지
+  /// 백그라운드 실행 중지 (단순화됨)
   Future<void> stopBackgroundTimer() async {
     try {
-      // 알림 업데이트 타이머 중지
-      _notificationUpdateTimer?.cancel();
-      _notificationUpdateTimer = null;
-      
       // 백그라운드 실행 비활성화
       if (_isBackgroundEnabled) {
         await FlutterBackground.disableBackgroundExecution();
@@ -128,7 +118,7 @@ class BackgroundService {
       }
       
       // 저장된 상태 제거
-      await _clearTimerState();
+      await clearTimerState();
     } catch (e) {
       if (kDebugMode) {
         print('Failed to stop background timer: $e');
@@ -136,38 +126,39 @@ class BackgroundService {
     }
   }
   
-  /// 시간 기반 계산으로 타이머 상태 복원
+  /// 단일 시간 기반 타이머 상태 복원
   Future<TimerState?> restoreTimerState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final stateJson = prefs.getString(_timerStateKey);
-      if (stateJson == null) return null;
+      final dataStr = prefs.getString(_timerDataKey);
+      if (dataStr == null) return null;
       
-      final stateData = jsonDecode(stateJson) as Map<String, dynamic>;
-      final startTimeStr = stateData['startTime'] as String?;
+      final data = jsonDecode(dataStr) as Map<String, dynamic>;
+      final startTimeStr = data['startTime'] as String?;
       if (startTimeStr == null) return null;
       
-      // 시간 기반 정확한 계산
       final startTime = DateTime.parse(startTimeStr);
-      final totalSeconds = stateData['totalSeconds'] as int;
-      final elapsedSeconds = DateTime.now().difference(startTime).inSeconds;
+      final totalSeconds = data['totalSeconds'] as int;
+      final pausedDuration = data['pausedDuration'] as int? ?? 0;
+      
+      // 시간 기반 정확한 계산
+      final now = DateTime.now();
+      final elapsedSeconds = now.difference(startTime).inSeconds - pausedDuration;
       final remainingSeconds = math.max(0, totalSeconds - elapsedSeconds);
       
       return TimerState(
         mode: TimerMode.values.firstWhere(
-          (m) => m.toString() == stateData['mode'],
+          (m) => m.toString() == data['mode'],
           orElse: () => TimerMode.focus,
         ),
-        status: remainingSeconds > 0
-            ? TimerStatus.running
-            : TimerStatus.completed,
+        status: remainingSeconds > 0 ? TimerStatus.running : TimerStatus.completed,
         remainingSeconds: remainingSeconds,
         totalSeconds: totalSeconds,
-        currentRound: stateData['currentRound'] ?? 1,
-        totalRounds: stateData['totalRounds'] ?? AppConstants.defaultRoundsUntilLongBreak,
-        selectedFarmId: stateData['selectedFarmId'],
+        currentRound: data['currentRound'] ?? 1,
+        totalRounds: data['totalRounds'] ?? AppConstants.defaultRoundsUntilLongBreak,
+        selectedFarmId: data['selectedFarmId'],
         startTime: startTime,
-        endTime: remainingSeconds <= 0 ? DateTime.now() : null,
+        endTime: remainingSeconds <= 0 ? now : null,
       );
     } catch (e) {
       if (kDebugMode) {
@@ -180,25 +171,22 @@ class BackgroundService {
   /// 백그라운드 실행 상태 확인
   bool get isBackgroundEnabled => _isBackgroundEnabled;
   
-  /// 타이머 상태 저장
-  Future<void> _saveTimerState(TimerState timerState, String? farmName) async {
+  /// 핵심 타이머 데이터만 저장 (단순화됨)
+  Future<void> saveTimerState(TimerState timerState) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final stateData = {
-        'mode': timerState.mode.toString(),
-        'status': timerState.status.toString(),
-        'remainingSeconds': timerState.remainingSeconds,
+      final data = {
+        'startTime': timerState.startTime?.toIso8601String(),
         'totalSeconds': timerState.totalSeconds,
+        'mode': timerState.mode.toString(),
         'currentRound': timerState.currentRound,
         'totalRounds': timerState.totalRounds,
         'selectedFarmId': timerState.selectedFarmId,
-        'startTime': timerState.startTime?.toIso8601String(),
-        'endTime': timerState.endTime?.toIso8601String(),
+        'pausedDuration': 0, // TimerService에서 관리하는 pausedDuration은 별도 처리 필요
         'savedAt': DateTime.now().toIso8601String(),
-        'farmName': farmName,
       };
       
-      await prefs.setString(_timerStateKey, jsonEncode(stateData));
+      await prefs.setString(_timerDataKey, jsonEncode(data));
     } catch (e) {
       if (kDebugMode) {
         print('Failed to save timer state: $e');
@@ -207,98 +195,19 @@ class BackgroundService {
   }
   
   /// 저장된 타이머 상태 제거
-  Future<void> _clearTimerState() async {
+  Future<void> clearTimerState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_timerStateKey);
+      await prefs.remove(_timerDataKey);
     } catch (e) {
       if (kDebugMode) {
         print('Failed to clear timer state: $e');
       }
     }
   }
-  
-  /// 백그라운드에서 알림 업데이트 (시간 기반 계산)
-  Future<void> _updateNotificationInBackground() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final stateJson = prefs.getString(_timerStateKey);
-      
-      if (stateJson == null) return;
-      
-      final stateData = jsonDecode(stateJson) as Map<String, dynamic>;
-      final startTimeStr = stateData['startTime'] as String?;
-      if (startTimeStr == null) return;
-      
-      final startTime = DateTime.parse(startTimeStr);
-      final totalSeconds = stateData['totalSeconds'] as int;
-      final elapsedSeconds = DateTime.now().difference(startTime).inSeconds;
-      final remainingSeconds = math.max(0, totalSeconds - elapsedSeconds);
-      
-      final notificationService = NotificationService();
-      await notificationService.initialize();
-      
-      final mode = stateData['mode'] as String;
-      final farmName = stateData['farmName'] as String? ?? '';
-      
-      if (remainingSeconds <= 0) {
-        // 타이머 완료 - 완료 알림만 전송 (상태는 앱에서 처리)
-        if (mode.contains('focus')) {
-          await notificationService.showFocusCompleteNotification(
-            farmName: farmName.isEmpty ? '농장' : farmName,
-            tomatoCount: 1,
-          );
-        } else {
-          await notificationService.showBreakCompleteNotification(
-            isLongBreak: mode.contains('longBreak'),
-            nextMode: '집중',
-          );
-        }
-        
-        // 타이머 완료 상태 저장
-        stateData['status'] = TimerStatus.completed.toString();
-        stateData['remainingSeconds'] = 0;
-        stateData['endTime'] = DateTime.now().toIso8601String();
-        await prefs.setString(_timerStateKey, jsonEncode(stateData));
-        
-        // 완료 후 알림 업데이트 중지
-        _notificationUpdateTimer?.cancel();
-        _notificationUpdateTimer = null;
-      } else {
-        // 진행 중 - 실시간 알림 업데이트
-        if (mode.contains('focus')) {
-          // 집중시간 - 농장명 포함
-          await notificationService.showTimerRunningNotification(
-            mode: '집중 시간',
-            timeLeft: _formatTime(remainingSeconds),
-            farmName: farmName,
-          );
-        } else {
-          // 휴식시간 - 농장명 제외, 전용 알림
-          final modeText = mode.contains('longBreak') ? '긴 휴식' : '짧은 휴식';
-          await notificationService.showBreakRunningNotification(
-            mode: modeText,
-            timeLeft: _formatTime(remainingSeconds),
-          );
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Notification update failed: $e');
-      }
-    }
-  }
 
   /// 서비스 정리
   void dispose() {
-    _notificationUpdateTimer?.cancel();
+    // 더 이상 필요한 정리 작업 없음 (단순화됨)
   }
-}
-
-
-/// 시간 포맷팅 헬퍼 함수
-String _formatTime(int seconds) {
-  final minutes = seconds ~/ 60;
-  final remainingSeconds = seconds % 60;
-  return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
 }

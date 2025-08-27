@@ -116,7 +116,7 @@ class TimerScreen extends ConsumerWidget {
                   children: [
                     // 현재 모드 표시
                     Text(
-                      '집중 시간',
+                      TimerTexts.modeTexts[timerState.mode] ?? '알 수 없음',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
                         fontWeight: FontWeight.bold,
