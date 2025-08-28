@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_background/flutter_background.dart';
 import '../models/timer_state.dart';
 import '../utils/constants.dart';
 import 'notification_service.dart';
-import 'background_service.dart';
 
 /// 타이머 백그라운드 서비스
 ///
@@ -27,19 +27,20 @@ class TimerService {
   final int _longBreakMinutes;
   final int _roundsUntilLongBreak;
 
-  // 단일 시간 기반 시스템을 위한 필드들
-  DateTime? _startTime;        // 타이머 시작 시간
-  DateTime? _pausedAt;         // 일시정지 시간
-  int _pausedDuration = 0;     // 누적 일시정지 시간(초)
-  int _totalSeconds = 0;       // 현재 모드의 총 시간
+  // 단순화된 타이머 필드들
+  DateTime? _startTime; // 타이머 시작 시간
+  int _totalSeconds = 0; // 현재 모드의 총 시간
+  int _remainingSeconds = 0; // 현재 남은 시간 (일시정지 시 고정)
+  bool _isPaused = false; // 일시정지 상태
+
   TimerMode _currentMode = TimerMode.focus;
   int _currentRound = 1;
   String? _selectedFarmId;
-  
-  Timer? _uiUpdateTimer;       // UI 업데이트용 가벼운 타이머
+
+  Timer? _mainTimer; // 메인 타이머 하나만 사용
+  Timer? _scheduledNotification; // 완료 알림용 타이머
   final StreamController<TimerState> _stateController = StreamController<TimerState>.broadcast();
   final NotificationService _notificationService = NotificationService();
-  final BackgroundService _backgroundService = BackgroundService.instance;
 
   // 알림 관련 콜백 함수들
   String Function()? _getFarmName;
@@ -50,10 +51,10 @@ class TimerService {
     // 스트림 구독 시 현재 상태 즉시 전송
     return _stateController.stream.asBroadcastStream();
   }
-  
-  /// 실시간 상태 계산 (단일 시간 기반 시스템의 핵심)
+
+  /// 단순화된 현재 상태 계산
   TimerState get currentState {
-    // 타이머가 시작되지 않았으면 현재 모드에 맞는 시간으로 초기 상태 반환
+    // 타이머가 시작되지 않았으면 초기 상태
     if (_startTime == null) {
       final modeSeconds = _totalSeconds > 0 ? _totalSeconds : _getSecondsForMode(_currentMode);
       return TimerState(
@@ -68,30 +69,34 @@ class TimerService {
         endTime: null,
       );
     }
-    
+
     final now = DateTime.now();
-    int elapsedSeconds;
-    
-    if (_pausedAt != null) {
-      // 일시정지 상태: 일시정지 시간까지만 계산
-      elapsedSeconds = _pausedAt!.difference(_startTime!).inSeconds + _pausedDuration;
+    int remainingSeconds;
+
+    // 일시정지 중이면 저장된 값 사용
+    if (_isPaused) {
+      remainingSeconds = _remainingSeconds;
     } else {
-      // 실행 상태: 현재 시간에서 누적 일시정지 시간 뺄
-      elapsedSeconds = now.difference(_startTime!).inSeconds - _pausedDuration;
+      // 실행 중이면 시작시간 기반으로 계산
+      final elapsedSeconds = now.difference(_startTime!).inSeconds;
+      remainingSeconds = (_totalSeconds - elapsedSeconds).clamp(0, _totalSeconds);
     }
-    
-    final remainingSeconds = math.max(0, _totalSeconds - elapsedSeconds);
-    
+
     // 상태 결정
     TimerStatus status;
-    if (_pausedAt != null) {
+    if (_isPaused) {
       status = TimerStatus.paused;
     } else if (remainingSeconds > 0) {
       status = TimerStatus.running;
     } else {
       status = TimerStatus.completed;
     }
-    
+
+    // 디버그 로그
+    if (kDebugMode) {
+      print('Timer: remaining=$remainingSeconds, paused=$_isPaused, status=$status');
+    }
+
     return TimerState(
       mode: _currentMode,
       status: status,
@@ -101,7 +106,7 @@ class TimerService {
       totalRounds: _roundsUntilLongBreak,
       selectedFarmId: _selectedFarmId,
       startTime: _startTime,
-      endTime: status == TimerStatus.completed ? _startTime!.add(Duration(seconds: _totalSeconds + _pausedDuration)) : null,
+      endTime: status == TimerStatus.completed ? now : null,
     );
   }
 
@@ -117,107 +122,115 @@ class TimerService {
   void start() {
     if (currentState.status == TimerStatus.running) return;
 
-    final now = DateTime.now();
-    _startTime = now;
-    _pausedAt = null;
-    _pausedDuration = 0;
+    _startTime = DateTime.now();
     _totalSeconds = _getSecondsForMode(_currentMode);
-    
-    // 즉시 UI 업데이트를 위해 상태 알림
-    _notifyStateChange();
-    
-    // UI 업데이트 타이머 시작
-    _startUIUpdateTimer();
-    
-    // 상태 저장
-    _saveCurrentState();
-    
-    // 실행 중 알림 시작
-    _showRunningNotification();
+    _remainingSeconds = _totalSeconds;
+    _isPaused = false;
 
-    // 백그라운드 타이머 시작
-    _startBackgroundTimer();
+    // 상태 저장
+    _saveState();
+
+    // UI 업데이트 타이머 시작
+    _startMainTimer();
+
+    // 백그라운드 실행 시작
+    _enableBackground();
+
+    // 완료 알림 예약
+    _scheduleCompletionNotification();
+
+    // 즉시 상태 알림
+    _notifyStateChange();
+
+    if (kDebugMode) {
+      print('Timer started: ${_totalSeconds}s');
+    }
   }
 
   /// 타이머 일시정지
   void pause() {
-    if (_startTime == null || _pausedAt != null) return;
-    
-    _pausedAt = DateTime.now();
-    
-    // UI 업데이트 타이머 중지
-    _uiUpdateTimer?.cancel();
-    
-    // 상태 저장 및 알림
-    _saveCurrentState();
-    _notifyStateChange();
-    
-    // 실행 중 알림 제거
-    _cancelRunningNotification();
+    if (_startTime == null || _isPaused) return;
 
-    // 백그라운드 타이머 중지
-    _stopBackgroundTimer();
+    // 정확한 경과 시간 계산하여 남은 시간 즉시 고정
+    final elapsedSeconds = DateTime.now().difference(_startTime!).inSeconds;
+    _remainingSeconds = (_totalSeconds - elapsedSeconds).clamp(0, _totalSeconds);
+    _isPaused = true;
+
+    // 메인 타이머 중지
+    _mainTimer?.cancel();
+
+    // 완료 알림 취소
+    _scheduledNotification?.cancel();
+
+    // 상태 저장 및 알림
+    _saveState();
+    _notifyStateChange();
+
+    if (kDebugMode) {
+      print('Timer paused at ${_remainingSeconds}s');
+    }
   }
 
   /// 타이머 재시작
   void resume() {
-    if (_pausedAt == null) return;
-    
-    // 누적 일시정지 시간 업데이트
-    _pausedDuration += DateTime.now().difference(_pausedAt!).inSeconds;
-    _pausedAt = null;
-    
-    // UI 업데이트 타이머 재시작
-    _startUIUpdateTimer();
-    
-    // 상태 저장 및 알림
-    _saveCurrentState();
-    _notifyStateChange();
-    
-    // 실행 중 알림 다시 시작
-    _showRunningNotification();
+    if (_startTime == null || !_isPaused) return;
 
-    // 백그라운드 타이머 재시작
-    _startBackgroundTimer();
+    // 새로운 시작 시간으로 남은 시간을 기준으로 설정
+    _startTime = DateTime.now();
+    _totalSeconds = _remainingSeconds;
+    _isPaused = false;
+
+    // 메인 타이머 재시작
+    _startMainTimer();
+
+    // 완료 알림 다시 예약
+    _scheduleCompletionNotification();
+
+    // 상태 저장 및 알림
+    _saveState();
+    _notifyStateChange();
+
+    if (kDebugMode) {
+      print('Timer resumed with ${_remainingSeconds}s remaining');
+    }
   }
 
   /// 타이머 정지 (초기 상태로 리셋)
   void stop() {
     // 모든 타이머 중지
-    _uiUpdateTimer?.cancel();
+    _mainTimer?.cancel();
+    _scheduledNotification?.cancel();
 
-    // 실행 중 알림 제거
-    _cancelRunningNotification();
-
-    // 백그라운드 타이머 중지
-    _stopBackgroundTimer();
+    // 백그라운드 비활성화
+    _disableBackground();
 
     // 상태 초기화
     _startTime = null;
-    _pausedAt = null;
-    _pausedDuration = 0;
+    _remainingSeconds = 0;
+    _isPaused = false;
     _currentMode = TimerMode.focus;
     _currentRound = 1;
     _totalSeconds = _getSecondsForMode(TimerMode.focus);
-    
+
     // 상태 저장 및 알림
-    _saveCurrentState();
+    _saveState();
     _notifyStateChange();
   }
 
   /// 타이머 리셋 (현재 모드 유지)
   void reset() {
-    // UI 업데이트 타이머 중지
-    _uiUpdateTimer?.cancel();
+    // 타이머 중지
+    _mainTimer?.cancel();
+    _scheduledNotification?.cancel();
 
     // 상태 초기화 (모드는 유지)
     _startTime = null;
-    _pausedAt = null;
-    _pausedDuration = 0;
+    _remainingSeconds = 0;
+    _isPaused = false;
     _totalSeconds = _getSecondsForMode(_currentMode);
-    
+
     // 상태 저장 및 알림
-    _saveCurrentState();
+    _saveState();
     _notifyStateChange();
   }
 
@@ -229,8 +242,9 @@ class TimerService {
 
   /// 다음 모드로 전환
   TimerState nextMode() {
-    // UI 업데이트 타이멲 중지
-    _uiUpdateTimer?.cancel();
+    // 타이머 중지
+    _mainTimer?.cancel();
+    _scheduledNotification?.cancel();
 
     TimerMode nextMode;
     int nextRound = _currentRound;
@@ -257,100 +271,199 @@ class TimerService {
 
     // 상태 초기화
     _startTime = null;
-    _pausedAt = null;
-    _pausedDuration = 0;
+    _remainingSeconds = 0;
+    _isPaused = false;
     _currentMode = nextMode;
     _currentRound = nextRound;
     _totalSeconds = _getSecondsForMode(nextMode);
 
     // 상태 저장 및 알림
-    _saveCurrentState();
+    _saveState();
     _notifyStateChange();
 
     return currentState;
   }
 
-  /// UI 업데이트용 가벼운 타이머 시작 (단일 시간 기반 시스템)
-  void _startUIUpdateTimer() {
-    _uiUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final state = currentState; // 실시간 계산된 현재 상태
-      
-      // 상태 변경 알림
+  /// 메인 타이머 시작 (단순화됨)
+  void _startMainTimer() {
+    _mainTimer?.cancel();
+    _mainTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_isPaused) {
+        timer.cancel();
+        return;
+      }
+
+      final state = currentState;
+
+      // UI 업데이트
       _notifyStateChange();
 
-      // 실행 중 알림 업데이트 (매초)
-      if (state.status == TimerStatus.running) {
-        _updateRunningNotification();
-      }
-
-      // 3초마다 백그라운드 상태 저장 (더 자주 저장)
-      if (state.remainingSeconds > 0 && state.remainingSeconds % 3 == 0) {
-        _saveCurrentState();
-      }
+      // 진행 중 알림 업데이트
+      _updateRunningNotification();
 
       // 완료 체크
       if (state.status == TimerStatus.completed) {
         timer.cancel();
-        
-        // 실행 중 알림 제거
-        _cancelRunningNotification();
-
-        // 백그라운드 타이머 중지
-        _stopBackgroundTimer();
-
-        // 완료 시 알림 전송
-        _sendCompletionNotification();
+        _handleCompletion();
       }
     });
   }
-  
+
+  /// 완료 처리
+  void _handleCompletion() {
+    _mainTimer?.cancel();
+    _scheduledNotification?.cancel();
+
+    // 백그라운드 비활성화
+    _disableBackground();
+
+    // 완료 알림 전송
+    _sendCompletionNotification();
+
+    // 상태 저장
+    _saveState();
+
+    if (kDebugMode) {
+      print('Timer completed');
+    }
+  }
+
   /// 상태 변경 알림 (스트림에 현재 상태 전송)
   void _notifyStateChange() {
     _stateController.add(currentState);
   }
-  
-  /// 현재 상태를 저장
-  void _saveCurrentState() {
+
+  /// 백그라운드 실행 활성화
+  Future<void> _enableBackground() async {
     try {
-      // BackgroundService에 현재 상태 저장 요청
-      _backgroundService.saveTimerState(currentState);
+      final backgroundConfig = FlutterBackgroundAndroidConfig(
+        notificationTitle: "토마토 타이머 실행 중",
+        notificationText: "뽀모도로 타이머가 백그라운드에서 실행되고 있습니다.",
+        notificationImportance: AndroidNotificationImportance.normal,
+      );
+
+      if (!await FlutterBackground.hasPermissions) {
+        await FlutterBackground.initialize(androidConfig: backgroundConfig);
+      }
+
+      await FlutterBackground.enableBackgroundExecution();
     } catch (e) {
       if (kDebugMode) {
-        print('Failed to save current state: $e');
+        print('Background enable failed: $e');
       }
     }
   }
-  
-  /// 저장된 상태에서 복원
-  Future<void> restoreFromState(TimerState restoredState) async {
+
+  /// 백그라운드 실행 비활성화
+  Future<void> _disableBackground() async {
     try {
-      // 복원된 상태로 내부 필드 설정
-      _currentMode = restoredState.mode;
-      _currentRound = restoredState.currentRound;
-      _selectedFarmId = restoredState.selectedFarmId;
-      _totalSeconds = restoredState.totalSeconds;
-      _startTime = restoredState.startTime;
-      
-      if (restoredState.status == TimerStatus.running && _startTime != null) {
-        // 실행 중이었다면 UI 타이머 재시작
-        _startUIUpdateTimer();
-        
-        // 알림 시작
-        _showRunningNotification();
-        _startBackgroundTimer();
+      await FlutterBackground.disableBackgroundExecution();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Background disable failed: $e');
       }
-      
-      // 상태 알림
-      _notifyStateChange();
+    }
+  }
+
+  /// 완료 알림 예약
+  void _scheduleCompletionNotification() {
+    _scheduledNotification?.cancel();
+
+    int remainingTime;
+    if (_isPaused) {
+      remainingTime = _remainingSeconds;
+    } else {
+      final elapsedSeconds = DateTime.now().difference(_startTime!).inSeconds;
+      remainingTime = (_totalSeconds - elapsedSeconds).clamp(0, _totalSeconds);
+    }
+    
+    if (remainingTime > 0) {
+      _scheduledNotification = Timer(Duration(seconds: remainingTime), () {
+        _handleCompletion();
+      });
       
       if (kDebugMode) {
-        print('Timer restored from saved state: ${restoredState.status}, ${restoredState.remainingSeconds}s');
+        print('Completion notification scheduled for ${remainingTime}s');
+      }
+    }
+  }
+
+  /// 상태 저장 (SharedPreferences)
+  Future<void> _saveState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('timer_start_time', _startTime?.toIso8601String() ?? '');
+      await prefs.setInt('timer_total_seconds', _totalSeconds);
+      await prefs.setInt('timer_remaining_seconds', _remainingSeconds);
+      await prefs.setBool('timer_is_paused', _isPaused);
+      await prefs.setString('timer_mode', _currentMode.toString());
+      await prefs.setInt('timer_round', _currentRound);
+      await prefs.setString('timer_farm_id', _selectedFarmId ?? '');
+    } catch (e) {
+      if (kDebugMode) {
+        print('Save state failed: $e');
+      }
+    }
+  }
+
+  /// 앱 복귀 시 상태 복원 (단순화됨)
+  Future<void> restoreState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final startTimeStr = prefs.getString('timer_start_time');
+
+      if (startTimeStr == null || startTimeStr.isEmpty) {
+        return; // 저장된 타이머 없음
+      }
+
+      _startTime = DateTime.parse(startTimeStr);
+      _totalSeconds = prefs.getInt('timer_total_seconds') ?? 1500;
+      _remainingSeconds = prefs.getInt('timer_remaining_seconds') ?? _totalSeconds;
+      _isPaused = prefs.getBool('timer_is_paused') ?? false;
+
+      final modeStr = prefs.getString('timer_mode');
+      if (modeStr != null) {
+        _currentMode = TimerMode.values.firstWhere((mode) => mode.toString() == modeStr, orElse: () => TimerMode.focus);
+      }
+
+      _currentRound = prefs.getInt('timer_round') ?? 1;
+      _selectedFarmId = prefs.getString('timer_farm_id');
+
+      // 현재 상태 확인
+      final state = currentState;
+
+      if (state.status == TimerStatus.completed) {
+        // 이미 완료됨 - 완료 처리
+        _handleCompletion();
+      } else if (!_isPaused) {
+        // 실행 중이면 타이머 재시작
+        _startMainTimer();
+        _enableBackground();
+        _scheduleCompletionNotification();
+      }
+
+      _notifyStateChange();
+
+      if (kDebugMode) {
+        print('Timer state restored: ${state.remainingSeconds}s remaining');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Failed to restore from state: $e');
+        print('Restore state failed: $e');
       }
     }
+  }
+
+  /// 현재 상태를 저장 (더 이상 사용하지 않음)
+  @Deprecated('Use _saveState() instead')
+  void _saveCurrentState() {
+    _saveState();
+  }
+
+  /// 저장된 상태에서 복원 (사용하지 않음 - restoreState로 대체됨)
+  @Deprecated('Use restoreState() instead')
+  Future<void> restoreFromState(TimerState restoredState, {int pausedDuration = 0}) async {
+    // 이 메서드는 더 이상 사용하지 않음
   }
 
   // _updateState 메서드는 새로운 시스템에서 사용하지 않음
@@ -391,14 +504,14 @@ class TimerService {
       // 실행 중이거나 일시정지 상태일 때는 기존 시간 유지
       newService._totalSeconds = _totalSeconds;
     }
-    
+
     // 기타 상태 복사
     newService._currentMode = _currentMode;
     newService._currentRound = _currentRound;
     newService._selectedFarmId = _selectedFarmId;
     newService._startTime = _startTime;
-    newService._pausedAt = _pausedAt;
-    newService._pausedDuration = _pausedDuration;
+    newService._remainingSeconds = _remainingSeconds;
+    newService._isPaused = _isPaused;
 
     return newService;
   }
@@ -424,7 +537,14 @@ class TimerService {
     if (_isNotificationEnabled?.call() == false) return;
 
     try {
-      if (currentState.mode != TimerMode.focus) {
+      if (currentState.mode == TimerMode.focus) {
+        // 집중 완료 알림 - 토마토 수확
+        final farmName = _getFarmName?.call() ?? '';
+        await _notificationService.showFocusCompleteNotification(
+          farmName: farmName.isEmpty ? '농장' : farmName,
+          tomatoCount: 0, // 간단히 0으로 설정
+        );
+      } else {
         // 휴식 완료 알림
         final isLongBreak = currentState.mode == TimerMode.longBreak;
         String nextMode;
@@ -450,7 +570,8 @@ class TimerService {
     }
   }
 
-  /// 실행 중 알림 표시
+  /// 실행 중 알림 표시 (더 이상 사용하지 않음)
+  @Deprecated('Replaced by _updateRunningNotification()')
   void _showRunningNotification() {
     // 알림이 비활성화되어 있으면 표시하지 않음
     if (_isNotificationEnabled?.call() == false) return;
@@ -500,7 +621,8 @@ class TimerService {
     }
   }
 
-  /// 실행 중 알림 제거
+  /// 실행 중 알림 제거 (더 이상 사용하지 않음)
+  @Deprecated('No longer used')
   void _cancelRunningNotification() {
     try {
       _notificationService.cancelTimerRunningNotification();
@@ -532,47 +654,11 @@ class TimerService {
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
-  /// 백그라운드 타이머 시작
-  void _startBackgroundTimer() {
-    try {
-      final farmName = _getFarmName?.call() ?? '';
-      _backgroundService.startBackgroundTimer(timerState: currentState, farmName: farmName);
-    } catch (e) {
-      if (kDebugMode) {
-        print('Failed to start background timer: $e');
-      }
-    }
-  }
-
-  /// 백그라운드 타이머 중지
-  void _stopBackgroundTimer() {
-    try {
-      _backgroundService.stopBackgroundTimer();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Failed to stop background timer: $e');
-      }
-    }
-  }
-
-
-  /// 앱 포그라운드 복귀 시 타이머 상태 동기화 (단일 시간 기반)
+  /// 앱 포그라운드 복귀 시 타이머 상태 동기화 (단순화됨)
   Future<void> syncWithBackgroundState() async {
     try {
-      final restoredState = await _backgroundService.restoreTimerState();
-      if (restoredState != null) {
-        // 새로운 restoreFromState 메서드 사용
-        await restoreFromState(restoredState);
-        
-        // 완료 시 알림 전송
-        if (restoredState.status == TimerStatus.completed) {
-          _sendCompletionNotification();
-        }
-      } else {
-        if (kDebugMode) {
-          print('No background timer state found');
-        }
-      }
+      // 단순화된 상태 복원 사용
+      await restoreState();
     } catch (e) {
       if (kDebugMode) {
         print('Failed to sync with background state: $e');
@@ -582,9 +668,9 @@ class TimerService {
 
   /// 리소스 정리
   void dispose() {
-    _uiUpdateTimer?.cancel();
-    _cancelRunningNotification();
-    _stopBackgroundTimer();
+    _mainTimer?.cancel();
+    _scheduledNotification?.cancel();
+    _disableBackground();
     _stateController.close();
     _notificationService.dispose();
   }

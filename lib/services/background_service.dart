@@ -6,6 +6,7 @@ import 'package:flutter_background/flutter_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/timer_state.dart';
 import '../utils/constants.dart';
+import 'notification_service.dart';
 
 /// 단순화된 백그라운드 서비스 (단일 시간 기반 시스템)
 ///
@@ -22,7 +23,8 @@ class BackgroundService {
   
   bool _isInitialized = false;
   bool _isBackgroundEnabled = false;
-  // 알림은 TimerService에서 직접 관리하므로 여기서는 제거
+  Timer? _backgroundTimer; // 백그라운드 독립 타이머
+  final NotificationService _notificationService = NotificationService();
   
   /// 백그라운드 서비스 초기화
   Future<bool> initialize() async {
@@ -71,6 +73,7 @@ class BackgroundService {
   Future<bool> startBackgroundTimer({
     required TimerState timerState,
     required String? farmName,
+    int pausedDuration = 0, // pausedDuration 매개변수 추가
   }) async {
     if (!_isInitialized) {
       final initialized = await initialize();
@@ -92,8 +95,11 @@ class BackgroundService {
         }
       }
       
-      // 핵심 데이터만 저장
-      await saveTimerState(timerState);
+      // 핵심 데이터만 저장 (pausedDuration 포함)
+      await saveTimerState(timerState, pausedDuration: pausedDuration);
+      
+      // 백그라운드 독립 타이머 시작
+      await _startBackgroundCompletionTimer(timerState, farmName, pausedDuration);
       
       if (kDebugMode) {
         print('Background timer started successfully');
@@ -111,6 +117,10 @@ class BackgroundService {
   /// 백그라운드 실행 중지 (단순화됨)
   Future<void> stopBackgroundTimer() async {
     try {
+      // 백그라운드 독립 타이머 중지
+      _backgroundTimer?.cancel();
+      _backgroundTimer = null;
+      
       // 백그라운드 실행 비활성화
       if (_isBackgroundEnabled) {
         await FlutterBackground.disableBackgroundExecution();
@@ -172,7 +182,7 @@ class BackgroundService {
   bool get isBackgroundEnabled => _isBackgroundEnabled;
   
   /// 핵심 타이머 데이터만 저장 (단순화됨)
-  Future<void> saveTimerState(TimerState timerState) async {
+  Future<void> saveTimerState(TimerState timerState, {int pausedDuration = 0}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final data = {
@@ -182,7 +192,7 @@ class BackgroundService {
         'currentRound': timerState.currentRound,
         'totalRounds': timerState.totalRounds,
         'selectedFarmId': timerState.selectedFarmId,
-        'pausedDuration': 0, // TimerService에서 관리하는 pausedDuration은 별도 처리 필요
+        'pausedDuration': pausedDuration, // 실제 pausedDuration 값 저장
         'savedAt': DateTime.now().toIso8601String(),
       };
       
@@ -206,8 +216,130 @@ class BackgroundService {
     }
   }
 
+  /// 저장된 타이머 데이터 원본 반환 (pausedDuration 포함)
+  Future<Map<String, dynamic>?> getStoredTimerData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dataStr = prefs.getString(_timerDataKey);
+      if (dataStr == null) return null;
+      
+      return jsonDecode(dataStr) as Map<String, dynamic>;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to get stored timer data: $e');
+      }
+      return null;
+    }
+  }
+
+  /// 백그라운드에서 완료 감지하는 독립 타이머 시작
+  Future<void> _startBackgroundCompletionTimer(TimerState timerState, String? farmName, int pausedDuration) async {
+    try {
+      // 기존 타이머가 있다면 중지
+      _backgroundTimer?.cancel();
+      
+      if (timerState.startTime == null) return;
+      
+      // 완료 예상 시간 계산
+      final completionTime = timerState.startTime!.add(Duration(seconds: timerState.totalSeconds + pausedDuration));
+      final now = DateTime.now();
+      
+      // 이미 완료되었다면 즉시 알림
+      if (now.isAfter(completionTime)) {
+        await _sendBackgroundCompletionNotification(timerState.mode, farmName);
+        return;
+      }
+      
+      // 완료까지 남은 시간 계산
+      final remainingDuration = completionTime.difference(now);
+      
+      if (kDebugMode) {
+        print('Background completion timer set for ${remainingDuration.inSeconds} seconds');
+      }
+      
+      // 완료 시점에 알림 전송하는 타이머 설정
+      _backgroundTimer = Timer(remainingDuration, () async {
+        await _sendBackgroundCompletionNotification(timerState.mode, farmName);
+        
+        // 상태를 completed로 업데이트
+        await _markAsCompleted(timerState);
+        
+        if (kDebugMode) {
+          print('Background timer completed and notification sent');
+        }
+      });
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to start background completion timer: $e');
+      }
+    }
+  }
+  
+  /// 백그라운드에서 완료 알림 전송
+  Future<void> _sendBackgroundCompletionNotification(TimerMode mode, String? farmName) async {
+    try {
+      await _notificationService.initialize();
+      
+      if (mode == TimerMode.focus) {
+        // 집중 완료 - 토마토 수확 알림
+        await _notificationService.showFocusCompleteNotification(
+          farmName: farmName?.isNotEmpty == true ? farmName! : '농장',
+          tomatoCount: 0, // 백그라운드에서는 기본값 사용
+        );
+        
+        if (kDebugMode) {
+          print('Background focus completion notification sent');
+        }
+      } else {
+        // 휴식 완료 알림
+        final isLongBreak = mode == TimerMode.longBreak;
+        await _notificationService.showBreakCompleteNotification(
+          isLongBreak: isLongBreak, 
+          nextMode: '집중', // 간단하게 다음은 집중으로 설정
+        );
+        
+        if (kDebugMode) {
+          print('Background break completion notification sent');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to send background completion notification: $e');
+      }
+    }
+  }
+  
+  /// 타이머 상태를 완료로 표시
+  Future<void> _markAsCompleted(TimerState timerState) async {
+    try {
+      final completedState = TimerState(
+        mode: timerState.mode,
+        status: TimerStatus.completed,
+        remainingSeconds: 0,
+        totalSeconds: timerState.totalSeconds,
+        currentRound: timerState.currentRound,
+        totalRounds: timerState.totalRounds,
+        selectedFarmId: timerState.selectedFarmId,
+        startTime: timerState.startTime,
+        endTime: DateTime.now(),
+      );
+      
+      await saveTimerState(completedState, pausedDuration: 0);
+      
+      if (kDebugMode) {
+        print('Timer state marked as completed in background');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to mark timer as completed: $e');
+      }
+    }
+  }
+
   /// 서비스 정리
   void dispose() {
-    // 더 이상 필요한 정리 작업 없음 (단순화됨)
+    _backgroundTimer?.cancel();
+    _notificationService.dispose();
   }
 }

@@ -283,11 +283,20 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
     }
   }
 
-  /// 백그라운드 상태와 동기화 (무조건 실행)
+  /// 백그라운드 상태와 동기화 (단순화됨)
   Future<void> _syncWithBackgroundState() async {
     try {
-      // 항상 백그라운드 상태 확인 (앱 강제 종료 후 재시작 대응)
-      await _timerService?.syncWithBackgroundState();
+      final previousState = state;
+      
+      // 단순화된 상태 복원
+      await _timerService?.restoreState();
+      
+      // 농장 선택 상태 동기화
+      await _syncFarmSelectionState();
+      
+      // 백그라운드에서 완료된 집중 모드 처리
+      final currentState = state;
+      await _handleBackgroundFocusCompletion(previousState, currentState);
       
       if (kDebugMode) {
         print('Background state sync completed');
@@ -295,6 +304,113 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
     } catch (e) {
       if (kDebugMode) {
         print('Failed to sync with background state: $e');
+      }
+    }
+  }
+
+  /// 농장 선택 상태 동기화
+  Future<void> _syncFarmSelectionState() async {
+    try {
+      final currentTimerState = state;
+      final selectedFarmId = currentTimerState.selectedFarmId;
+      
+      if (selectedFarmId != null) {
+        // 현재 선택된 농장과 복원된 농장이 다르면 동기화
+        final currentSelectedFarm = ref.read(selectedFarmProvider);
+        
+        if (currentSelectedFarm?.id != selectedFarmId) {
+          // 농장 목록에서 해당 농장 찾기
+          final farmList = ref.read(farmListProvider);
+          Farm? targetFarm;
+          
+          try {
+            targetFarm = farmList.firstWhere((farm) => farm.id == selectedFarmId);
+          } catch (e) {
+            // 해당 농장을 찾을 수 없으면 첫 번째 농장으로 대체
+            targetFarm = farmList.isNotEmpty ? farmList.first : null;
+          }
+          
+          if (targetFarm != null) {
+            // 농장 선택 상태 동기화
+            ref.read(selectedFarmProvider.notifier).state = targetFarm;
+            
+            if (kDebugMode) {
+              print('Farm selection synced: ${targetFarm.name}');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to sync farm selection state: $e');
+      }
+    }
+  }
+
+  /// 백그라운드에서 완료된 집중 모드 처리 (토마토 수확)
+  Future<void> _handleBackgroundFocusCompletion(TimerState previousState, TimerState currentState) async {
+    try {
+      // 집중 모드가 완료되고, 이전 상태에서는 완료가 아니었던 경우
+      if (currentState.mode == TimerMode.focus && 
+          currentState.status == TimerStatus.completed && 
+          previousState.status != TimerStatus.completed &&
+          !_hasHarvestedForCurrentSession) {
+        
+        _hasHarvestedForCurrentSession = true;
+        
+        // 백그라운드에서 완료된 토마토 수확 처리
+        await _harvestBackgroundTomato(currentState.selectedFarmId);
+        
+        if (kDebugMode) {
+          print('Background focus completion processed - tomato harvested');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to handle background focus completion: $e');
+      }
+    }
+  }
+
+  /// 백그라운드 완료 시 토마토 수확 처리
+  Future<void> _harvestBackgroundTomato(String? farmId) async {
+    try {
+      final currentSettings = ref.read(timerSettingsProvider);
+
+      if (farmId != null) {
+        // 선택된 농장에 토마토 수확
+        ref.read(farmListProvider.notifier).harvestTomato(farmId);
+        // 통계에 토마토 수확 기록 (농장 선택됨)
+        ref
+            .read(statisticsProvider.notifier)
+            .recordTomatoHarvest(
+              farmId: farmId,
+              date: DateTime.now(),
+              focusMinutes:
+                  currentSettings.focusMinutes == 0
+                      ? 1
+                      : currentSettings.focusMinutes,
+            );
+      } else {
+        // 농장 선택 없이도 수확 가능 (통계용)
+        ref
+            .read(statisticsProvider.notifier)
+            .recordTomatoHarvest(
+              farmId: 'no-farm',
+              date: DateTime.now(),
+              focusMinutes:
+                  currentSettings.focusMinutes == 0
+                      ? 1
+                      : currentSettings.focusMinutes,
+            );
+      }
+      
+      if (kDebugMode) {
+        print('Background tomato harvest completed for farm: ${farmId ?? "no-farm"}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to harvest background tomato: $e');
       }
     }
   }
