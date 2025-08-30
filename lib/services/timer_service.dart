@@ -439,6 +439,10 @@ class TimerService {
       await prefs.setString('timer_mode', _currentMode.toString());
       await prefs.setInt('timer_round', _currentRound);
       await prefs.setString('timer_farm_id', _selectedFarmId ?? '');
+      
+      if (kDebugMode) {
+        print('SAVE STATE: mode=$_currentMode, round=$_currentRound, remaining=$_remainingSeconds, total=$_totalSeconds, paused=$_isPaused, startTime=${_startTime?.toIso8601String()}');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Save state failed: $e');
@@ -452,18 +456,24 @@ class TimerService {
       final prefs = await SharedPreferences.getInstance();
       final startTimeStr = prefs.getString('timer_start_time');
 
-      if (startTimeStr == null || startTimeStr.isEmpty) {
-        // 저장된 타이머 없음 - 초기 상태 유지
+      // 완료 상태나 저장된 상태가 있는지 확인
+      final savedMode = prefs.getString('timer_mode');
+      final savedRound = prefs.getInt('timer_round');
+      final savedRemaining = prefs.getInt('timer_remaining_seconds');
+      
+      if ((startTimeStr == null || startTimeStr.isEmpty) && (savedMode == null || savedRound == null)) {
+        // 진짜 저장된 타이머 없음 - 초기 상태 유지
         _notifyStateChange();
         return;
       }
 
-      // 저장된 상태 복원
-      _startTime = DateTime.parse(startTimeStr);
-      _totalSeconds = prefs.getInt('timer_total_seconds') ?? _getSecondsForMode(_currentMode);
-      _remainingSeconds = prefs.getInt('timer_remaining_seconds') ?? _totalSeconds;
-      _isPaused = prefs.getBool('timer_is_paused') ?? false;
-
+      // 저장된 상태 복원 (모드와 라운드부터 먼저 복원)
+      if (startTimeStr != null && startTimeStr.isNotEmpty) {
+        _startTime = DateTime.parse(startTimeStr);
+      } else {
+        _startTime = null; // 완료 상태의 경우
+      }
+      
       final modeStr = prefs.getString('timer_mode');
       if (modeStr != null) {
         _currentMode = TimerMode.values.firstWhere((mode) => mode.toString() == modeStr, orElse: () => TimerMode.focus);
@@ -473,23 +483,41 @@ class TimerService {
 
       _currentRound = prefs.getInt('timer_round') ?? 1;
       _selectedFarmId = prefs.getString('timer_farm_id');
+      
+      // 모드가 복원된 후 시간 정보 복원
+      _totalSeconds = prefs.getInt('timer_total_seconds') ?? _getSecondsForMode(_currentMode);
+      _remainingSeconds = prefs.getInt('timer_remaining_seconds') ?? _totalSeconds;
+      _isPaused = prefs.getBool('timer_is_paused') ?? false;
+      
+      if (kDebugMode) {
+        print('RESTORE STATE: loaded mode=$modeStr->$_currentMode, round=$_currentRound, remaining=$_remainingSeconds, total=$_totalSeconds, paused=$_isPaused, startTime=$startTimeStr');
+      }
 
       // 백그라운드에서 완료되었는지 확인 (시간 기반 계산)
-      final now = DateTime.now();
-      final elapsedSeconds = now.difference(_startTime!).inSeconds;
-      final shouldBeCompleted = !_isPaused && elapsedSeconds >= _totalSeconds;
+      bool shouldBeCompleted = false;
+      if (_startTime != null && !_isPaused) {
+        final now = DateTime.now();
+        final elapsedSeconds = now.difference(_startTime!).inSeconds;
+        shouldBeCompleted = elapsedSeconds >= _totalSeconds;
+      }
 
       if (shouldBeCompleted) {
-        // 백그라운드에서 완료됨 - 다음 모드로 자동 전환
+        // 백그라운드에서 완료됨 - 완료 상태로 설정 (자동 전환 없음)
         if (kDebugMode) {
-          print('Background completion detected - auto transitioning to next mode');
+          print('Background completion detected - setting as completed');
         }
         
-        _autoTransitionToNextMode();
-        await _saveState(); // 전환된 상태 저장
+        // 완료 상태로 설정하되 _startTime 유지 (완료 상태 표시를 위해)
+        _remainingSeconds = 0;
+        _isPaused = false;
+        _mainTimer?.cancel();
+        _scheduledNotification?.cancel();
+        
+        // 완료 상태 저장
+        await _saveState();
         
         if (kDebugMode) {
-          print('Auto-transitioned to $_currentMode mode, round $_currentRound');
+          print('Timer completed in background: $_currentMode mode, round $_currentRound');
         }
       } else if (!_isPaused) {
         // 타이머가 여전히 실행 중인 상태
@@ -516,6 +544,7 @@ class TimerService {
       if (kDebugMode) {
         final state = currentState;
         print('Timer state restored: Mode=${state.mode}, Status=${state.status}, Round=${state.currentRound}/${state.totalRounds}, Time=${state.formattedTime}');
+        print('Restored values: _currentMode=$_currentMode, _currentRound=$_currentRound, _remainingSeconds=$_remainingSeconds, _totalSeconds=$_totalSeconds');
       }
     } catch (e) {
       if (kDebugMode) {

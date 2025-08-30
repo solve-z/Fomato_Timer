@@ -47,8 +47,8 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
       (newState) {
         state = newState;
 
-        // 집중 모드 완료 시 토마토 수확 처리
-        _handleFocusCompletion(newState);
+        // 모드 완료 시 처리 (토마토 수확 및 자동 전환)
+        _handleModeCompletion(newState);
       },
       onError: (error) {},
       onDone: () {},
@@ -110,9 +110,9 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
     _lastCompletedTime = null; // 모드 전환 시 리셋
   }
 
-  /// 집중 모드 완료 처리 (토마토 수확)
-  void _handleFocusCompletion(TimerState newState) {
-    if (newState.mode != TimerMode.focus || newState.status != TimerStatus.completed) {
+  /// 모드 완료 처리 (토마토 수확 및 자동 전환)
+  void _handleModeCompletion(TimerState newState) {
+    if (newState.status != TimerStatus.completed) {
       return;
     }
 
@@ -121,22 +121,37 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
     if (_lastCompletedTime != null && 
         now.difference(_lastCompletedTime!).inMilliseconds < 2000) {
       if (kDebugMode) {
-        print('Duplicate completion detected - skipping harvest');
+        print('Duplicate completion detected - skipping processing');
       }
       return;
     }
 
     _lastCompletedTime = now;
 
-    // 플랫폼별 처리
-    if (Platform.isAndroid) {
-      _harvestTomatoOnly(); // 알림은 Foreground Service에서
-    } else {
-      _harvestTomato(); // 알림 포함
+    // 집중 모드 완료 시 토마토 수확
+    if (newState.mode == TimerMode.focus) {
+      // 플랫폼별 처리
+      if (Platform.isAndroid) {
+        _harvestTomatoOnly(); // 알림은 Foreground Service에서
+      } else {
+        _harvestTomato(); // 알림 포함
+      }
+
+      if (kDebugMode) {
+        print('Focus completion processed - tomato harvested');
+      }
     }
 
-    if (kDebugMode) {
-      print('Focus completion processed - tomato harvested');
+    // 모든 모드 완료 시 0.5초 후 자동 전환
+    if (newState.mode != TimerMode.stopped) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (state.status == TimerStatus.completed) {
+          nextMode();
+          if (kDebugMode) {
+            print('Auto transition to next mode after ${newState.mode}');
+          }
+        }
+      });
     }
   }
 
@@ -265,13 +280,10 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
       // 새 서비스의 스트림 구독
       _stateSubscription = _timerService!.stateStream.listen(
         (newState) {
-          state = newState.copyWith(
-            // UI가 다음 모드 버튼을 표시해야 하는 경우
-            showNextModeButton: (newState.status == TimerStatus.completed && newState.mode != TimerMode.stopped) ? true : false,
-          );
+          state = newState;
 
-          // 집중 모드 완료 시 토마토 수확 처리
-          _handleFocusCompletion(newState);
+          // 모드 완료 시 처리 (토마토 수확 및 자동 전환)
+          _handleModeCompletion(newState);
         },
         onError: (error) {},
         onDone: () {},

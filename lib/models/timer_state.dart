@@ -29,7 +29,6 @@ class TimerState {
   final String? selectedFarmId; // 선택된 농장 ID
   final DateTime? startTime; // 시작 시간
   final DateTime? endTime; // 종료 시간
-  final bool showNextModeButton;
 
   const TimerState({
     required this.mode,
@@ -41,7 +40,6 @@ class TimerState {
     this.selectedFarmId,
     this.startTime,
     this.endTime,
-    this.showNextModeButton = false,
   });
 
   /// 초기 타이머 상태
@@ -97,7 +95,6 @@ class TimerState {
     String? selectedFarmId,
     DateTime? startTime,
     DateTime? endTime,
-    bool? showNextModeButton,
   }) {
     return TimerState(
       mode: mode ?? this.mode,
@@ -109,7 +106,6 @@ class TimerState {
       selectedFarmId: selectedFarmId ?? this.selectedFarmId,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
-      showNextModeButton: showNextModeButton ?? this.showNextModeButton,
     );
   }
 
