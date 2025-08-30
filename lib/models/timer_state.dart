@@ -2,33 +2,34 @@ import '../utils/constants.dart';
 
 /// 타이머 상태 열거형
 enum TimerMode {
-  focus,      // 집중 모드 (25분)
+  focus, // 집중 모드 (25분)
   shortBreak, // 짧은 휴식 (5분)
-  longBreak,  // 긴 휴식 (15분)
-  stopped,    // 정지 상태
+  longBreak, // 긴 휴식 (15분)
+  stopped, // 정지 상태
 }
 
 /// 타이머 실행 상태
 enum TimerStatus {
-  initial,  // 초기 상태
-  running,  // 실행 중
-  paused,   // 일시정지
-  completed // 완료
+  initial, // 초기 상태
+  running, // 실행 중
+  paused, // 일시정지
+  completed, // 완료
 }
 
 /// 타이머 상태 모델
-/// 
+///
 /// 뽀모도로 타이머의 모든 상태 정보를 담고 있습니다.
 class TimerState {
-  final TimerMode mode;           // 현재 모드 (집중/휴식)
-  final TimerStatus status;       // 실행 상태
-  final int remainingSeconds;     // 남은 시간 (초)
-  final int totalSeconds;         // 전체 시간 (초)
-  final int currentRound;         // 현재 라운드 (1-4)
-  final int totalRounds;          // 총 라운드 수
-  final String? selectedFarmId;   // 선택된 농장 ID
-  final DateTime? startTime;      // 시작 시간
-  final DateTime? endTime;        // 종료 시간
+  final TimerMode mode; // 현재 모드 (집중/휴식)
+  final TimerStatus status; // 실행 상태
+  final int remainingSeconds; // 남은 시간 (초)
+  final int totalSeconds; // 전체 시간 (초)
+  final int currentRound; // 현재 라운드 (1-4)
+  final int totalRounds; // 총 라운드 수
+  final String? selectedFarmId; // 선택된 농장 ID
+  final DateTime? startTime; // 시작 시간
+  final DateTime? endTime; // 종료 시간
+  final bool showNextModeButton;
 
   const TimerState({
     required this.mode,
@@ -40,6 +41,7 @@ class TimerState {
     this.selectedFarmId,
     this.startTime,
     this.endTime,
+    this.showNextModeButton = false,
   });
 
   /// 초기 타이머 상태
@@ -64,12 +66,8 @@ class TimerState {
       currentRound: json['currentRound'] as int,
       totalRounds: json['totalRounds'] as int,
       selectedFarmId: json['selectedFarmId'] as String?,
-      startTime: json['startTime'] != null 
-          ? DateTime.parse(json['startTime'] as String) 
-          : null,
-      endTime: json['endTime'] != null 
-          ? DateTime.parse(json['endTime'] as String) 
-          : null,
+      startTime: json['startTime'] != null ? DateTime.parse(json['startTime'] as String) : null,
+      endTime: json['endTime'] != null ? DateTime.parse(json['endTime'] as String) : null,
     );
   }
 
@@ -99,6 +97,7 @@ class TimerState {
     String? selectedFarmId,
     DateTime? startTime,
     DateTime? endTime,
+    bool? showNextModeButton,
   }) {
     return TimerState(
       mode: mode ?? this.mode,
@@ -110,6 +109,7 @@ class TimerState {
       selectedFarmId: selectedFarmId ?? this.selectedFarmId,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      showNextModeButton: showNextModeButton ?? this.showNextModeButton,
     );
   }
 

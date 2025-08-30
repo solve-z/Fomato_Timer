@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_background/flutter_background.dart';
 import '../models/timer_state.dart';
@@ -41,6 +43,9 @@ class TimerService {
   Timer? _scheduledNotification; // 완료 알림용 타이머
   final StreamController<TimerState> _stateController = StreamController<TimerState>.broadcast();
   final NotificationService _notificationService = NotificationService();
+
+  // Android Foreground Service를 위한 MethodChannel
+  static const MethodChannel _androidTimerChannel = MethodChannel('com.example.fomato_timer/timer');
 
   // 알림 관련 콜백 함수들
   String Function()? _getFarmName;
@@ -130,14 +135,20 @@ class TimerService {
     // 상태 저장
     _saveState();
 
-    // UI 업데이트 타이머 시작
-    _startMainTimer();
+    // Android에서는 Foreground Service 사용, 다른 플랫폼은 기존 방식
+    if (Platform.isAndroid) {
+      _startAndroidForegroundService();
+      // Android에서는 flutter_background 사용하지 않음 (중복 알림 방지)
+    } else {
+      // UI 업데이트 타이머 시작
+      _startMainTimer();
 
-    // 백그라운드 실행 시작
-    _enableBackground();
+      // 백그라운드 실행 시작 (iOS/기타)
+      _enableBackground();
 
-    // 완료 알림 예약
-    _scheduleCompletionNotification();
+      // 완료 알림 예약
+      _scheduleCompletionNotification();
+    }
 
     // 즉시 상태 알림
     _notifyStateChange();
@@ -156,11 +167,16 @@ class TimerService {
     _remainingSeconds = (_totalSeconds - elapsedSeconds).clamp(0, _totalSeconds);
     _isPaused = true;
 
-    // 메인 타이머 중지
-    _mainTimer?.cancel();
+    // Android에서는 Foreground Service 일시정지, 다른 플랫폼은 기존 방식
+    if (Platform.isAndroid) {
+      _pauseAndroidForegroundService();
+    } else {
+      // 메인 타이머 중지
+      _mainTimer?.cancel();
 
-    // 완료 알림 취소
-    _scheduledNotification?.cancel();
+      // 완료 알림 취소
+      _scheduledNotification?.cancel();
+    }
 
     // 상태 저장 및 알림
     _saveState();
@@ -180,11 +196,16 @@ class TimerService {
     _totalSeconds = _remainingSeconds;
     _isPaused = false;
 
-    // 메인 타이머 재시작
-    _startMainTimer();
+    // Android에서는 Foreground Service 재시작, 다른 플랫폼은 기존 방식
+    if (Platform.isAndroid) {
+      _resumeAndroidForegroundService();
+    } else {
+      // 메인 타이머 재시작
+      _startMainTimer();
 
-    // 완료 알림 다시 예약
-    _scheduleCompletionNotification();
+      // 완료 알림 다시 예약
+      _scheduleCompletionNotification();
+    }
 
     // 상태 저장 및 알림
     _saveState();
@@ -197,12 +218,17 @@ class TimerService {
 
   /// 타이머 정지 (초기 상태로 리셋)
   void stop() {
-    // 모든 타이머 중지
-    _mainTimer?.cancel();
-    _scheduledNotification?.cancel();
+    // Android에서는 Foreground Service 정지, 다른 플랫폼은 기존 방식
+    if (Platform.isAndroid) {
+      _stopAndroidForegroundService();
+    } else {
+      // 모든 타이머 중지
+      _mainTimer?.cancel();
+      _scheduledNotification?.cancel();
 
-    // 백그라운드 비활성화
-    _disableBackground();
+      // 백그라운드 비활성화
+      _disableBackground();
+    }
 
     // 상태 초기화
     _startTime = null;
@@ -246,6 +272,17 @@ class TimerService {
     _mainTimer?.cancel();
     _scheduledNotification?.cancel();
 
+    _autoTransitionToNextMode();
+
+    // 상태 저장 및 알림
+    _saveState();
+    _notifyStateChange();
+
+    return currentState;
+  }
+
+  /// 다음 모드로 자동 전환 (내부 로직)
+  void _autoTransitionToNextMode() {
     TimerMode nextMode;
     int nextRound = _currentRound;
 
@@ -276,12 +313,6 @@ class TimerService {
     _currentMode = nextMode;
     _currentRound = nextRound;
     _totalSeconds = _getSecondsForMode(nextMode);
-
-    // 상태 저장 및 알림
-    _saveState();
-    _notifyStateChange();
-
-    return currentState;
   }
 
   /// 메인 타이머 시작 (단순화됨)
@@ -304,6 +335,9 @@ class TimerService {
       // 완료 체크
       if (state.status == TimerStatus.completed) {
         timer.cancel();
+        if (kDebugMode) {
+          print('Timer completed in main loop - Platform: ${Platform.operatingSystem}');
+        }
         _handleCompletion();
       }
     });
@@ -314,17 +348,23 @@ class TimerService {
     _mainTimer?.cancel();
     _scheduledNotification?.cancel();
 
-    // 백그라운드 비활성화
-    _disableBackground();
+    if (Platform.isAndroid) {
+      // Android: Foreground Service가 알림 처리, Flutter는 상태 관리만
+      if (kDebugMode) {
+        print('Android: Timer completed, Foreground Service handles notification');
+      }
 
-    // 완료 알림 전송
-    _sendCompletionNotification();
+      // 완료 상태를 빠르게 정리하여 중복 UI 처리 방지
+      _clearAndResetAfterCompletion();
+    } else {
+      // iOS/기타: 기존 방식
+      _disableBackground();
+      _sendCompletionNotification();
+      _saveState();
 
-    // 상태 저장
-    _saveState();
-
-    if (kDebugMode) {
-      print('Timer completed');
+      if (kDebugMode) {
+        print('Timer completed - Platform: ${Platform.operatingSystem}');
+      }
     }
   }
 
@@ -376,12 +416,12 @@ class TimerService {
       final elapsedSeconds = DateTime.now().difference(_startTime!).inSeconds;
       remainingTime = (_totalSeconds - elapsedSeconds).clamp(0, _totalSeconds);
     }
-    
+
     if (remainingTime > 0) {
       _scheduledNotification = Timer(Duration(seconds: remainingTime), () {
         _handleCompletion();
       });
-      
+
       if (kDebugMode) {
         print('Completion notification scheduled for ${remainingTime}s');
       }
@@ -406,58 +446,82 @@ class TimerService {
     }
   }
 
-  /// 앱 복귀 시 상태 복원 (단순화됨)
+  /// 앱 복귀 시 상태 복원 (백그라운드 완료 처리 개선)
   Future<void> restoreState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final startTimeStr = prefs.getString('timer_start_time');
 
       if (startTimeStr == null || startTimeStr.isEmpty) {
-        return; // 저장된 타이머 없음
+        // 저장된 타이머 없음 - 초기 상태 유지
+        _notifyStateChange();
+        return;
       }
 
+      // 저장된 상태 복원
       _startTime = DateTime.parse(startTimeStr);
-      _totalSeconds = prefs.getInt('timer_total_seconds') ?? 1500;
+      _totalSeconds = prefs.getInt('timer_total_seconds') ?? _getSecondsForMode(_currentMode);
       _remainingSeconds = prefs.getInt('timer_remaining_seconds') ?? _totalSeconds;
       _isPaused = prefs.getBool('timer_is_paused') ?? false;
 
       final modeStr = prefs.getString('timer_mode');
       if (modeStr != null) {
         _currentMode = TimerMode.values.firstWhere((mode) => mode.toString() == modeStr, orElse: () => TimerMode.focus);
+      } else {
+        _currentMode = TimerMode.focus;
       }
 
       _currentRound = prefs.getInt('timer_round') ?? 1;
       _selectedFarmId = prefs.getString('timer_farm_id');
 
-      // 현재 상태 확인
-      final state = currentState;
+      // 백그라운드에서 완료되었는지 확인 (시간 기반 계산)
+      final now = DateTime.now();
+      final elapsedSeconds = now.difference(_startTime!).inSeconds;
+      final shouldBeCompleted = !_isPaused && elapsedSeconds >= _totalSeconds;
 
-      if (state.status == TimerStatus.completed) {
-        // 이미 완료됨 - 완료 처리
-        _handleCompletion();
+      if (shouldBeCompleted) {
+        // 백그라운드에서 완료됨 - 다음 모드로 자동 전환
+        if (kDebugMode) {
+          print('Background completion detected - auto transitioning to next mode');
+        }
+        
+        _autoTransitionToNextMode();
+        await _saveState(); // 전환된 상태 저장
+        
+        if (kDebugMode) {
+          print('Auto-transitioned to $_currentMode mode, round $_currentRound');
+        }
       } else if (!_isPaused) {
-        // 실행 중이면 타이머 재시작
-        _startMainTimer();
-        _enableBackground();
-        _scheduleCompletionNotification();
+        // 타이머가 여전히 실행 중인 상태
+        if (Platform.isAndroid) {
+          // Android: Foreground Service 재시작 확인
+          final isServiceRunning = await isAndroidForegroundServiceRunning();
+          if (!isServiceRunning) {
+            // 서비스가 중단된 경우 재시작
+            _startAndroidForegroundService();
+          } else {
+            // 서비스가 실행 중이면 UI 동기화만
+            _startMainTimer();
+          }
+        } else {
+          // iOS/기타: 타이머 재시작
+          _startMainTimer();
+          _enableBackground();
+          _scheduleCompletionNotification();
+        }
       }
 
       _notifyStateChange();
 
       if (kDebugMode) {
-        print('Timer state restored: ${state.remainingSeconds}s remaining');
+        final state = currentState;
+        print('Timer state restored: Mode=${state.mode}, Status=${state.status}, Round=${state.currentRound}/${state.totalRounds}, Time=${state.formattedTime}');
       }
     } catch (e) {
       if (kDebugMode) {
         print('Restore state failed: $e');
       }
     }
-  }
-
-  /// 현재 상태를 저장 (더 이상 사용하지 않음)
-  @Deprecated('Use _saveState() instead')
-  void _saveCurrentState() {
-    _saveState();
   }
 
   /// 저장된 상태에서 복원 (사용하지 않음 - restoreState로 대체됨)
@@ -531,8 +595,16 @@ class TimerService {
   /// 포맷된 시간 문자열 (MM:SS)
   String get formattedTime => currentState.formattedTime;
 
-  /// 완료 시 알림 전송
+  /// 완료 시 알림 전송 (Android에서는 사용 안함)
   Future<void> _sendCompletionNotification() async {
+    // Android는 Foreground Service에서 처리하므로 완전 차단
+    if (Platform.isAndroid) {
+      if (kDebugMode) {
+        print('Android: Completion notification blocked - handled by Foreground Service');
+      }
+      return;
+    }
+
     // 알림이 비활성화되어 있으면 전송하지 않음
     if (_isNotificationEnabled?.call() == false) return;
 
@@ -570,34 +642,11 @@ class TimerService {
     }
   }
 
-  /// 실행 중 알림 표시 (더 이상 사용하지 않음)
-  @Deprecated('Replaced by _updateRunningNotification()')
-  void _showRunningNotification() {
-    // 알림이 비활성화되어 있으면 표시하지 않음
-    if (_isNotificationEnabled?.call() == false) return;
-
-    try {
-      final state = currentState;
-      final mode = _getModeText(state.mode);
-      final timeLeft = _formatTime(state.remainingSeconds);
-      final farmName = _getFarmName?.call() ?? '';
-
-      if (state.mode == TimerMode.focus) {
-        // 집중시간 - 농장명 포함
-        _notificationService.showTimerRunningNotification(mode: mode, timeLeft: timeLeft, farmName: farmName);
-      } else {
-        // 휴식시간 - 농장명 제외, 전용 알림
-        _notificationService.showBreakRunningNotification(mode: mode, timeLeft: timeLeft);
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Failed to show running notification: $e');
-      }
-    }
-  }
-
-  /// 실행 중 알림 업데이트
+  /// 실행 중 알림 업데이트 (Android가 아닌 경우만)
   void _updateRunningNotification() {
+    // Android는 Foreground Service에서 처리하므로 중복 방지
+    if (Platform.isAndroid) return;
+
     // 알림이 비활성화되어 있으면 업데이트하지 않음
     if (_isNotificationEnabled?.call() == false) return;
 
@@ -617,18 +666,6 @@ class TimerService {
     } catch (e) {
       if (kDebugMode) {
         print('Failed to update running notification: $e');
-      }
-    }
-  }
-
-  /// 실행 중 알림 제거 (더 이상 사용하지 않음)
-  @Deprecated('No longer used')
-  void _cancelRunningNotification() {
-    try {
-      _notificationService.cancelTimerRunningNotification();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Failed to cancel running notification: $e');
       }
     }
   }
@@ -666,11 +703,135 @@ class TimerService {
     }
   }
 
+  /// Android Foreground Service 시작
+  Future<void> _startAndroidForegroundService() async {
+    try {
+      final farmName = _getFarmName?.call() ?? '';
+      final modeString = _currentMode.toString().split('.').last;
+
+      await _androidTimerChannel.invokeMethod('startForegroundTimer', {'duration': _totalSeconds, 'farmName': farmName, 'mode': modeString});
+
+      // Android에서도 UI 업데이트를 위한 메인 타이머 시작
+      _startMainTimer();
+
+      if (kDebugMode) {
+        print('Android Foreground Service started');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to start Android Foreground Service: $e');
+      }
+      // 실패 시 기존 방식으로 fallback
+      _startMainTimer();
+      _enableBackground();
+      _scheduleCompletionNotification();
+    }
+  }
+
+  /// Android Foreground Service 일시정지
+  Future<void> _pauseAndroidForegroundService() async {
+    try {
+      await _androidTimerChannel.invokeMethod('pauseForegroundTimer');
+
+      // UI 업데이트 타이머도 중지
+      _mainTimer?.cancel();
+
+      if (kDebugMode) {
+        print('Android Foreground Service paused');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to pause Android Foreground Service: $e');
+      }
+      // 실패 시 기존 방식으로 처리
+      _mainTimer?.cancel();
+      _scheduledNotification?.cancel();
+    }
+  }
+
+  /// Android Foreground Service 재시작
+  Future<void> _resumeAndroidForegroundService() async {
+    try {
+      await _androidTimerChannel.invokeMethod('resumeForegroundTimer');
+
+      // UI 업데이트 타이머 재시작
+      _startMainTimer();
+
+      if (kDebugMode) {
+        print('Android Foreground Service resumed');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to resume Android Foreground Service: $e');
+      }
+      // 실패 시 기존 방식으로 처리
+      _startMainTimer();
+      _scheduleCompletionNotification();
+    }
+  }
+
+  /// Android Foreground Service 정지
+  Future<void> _stopAndroidForegroundService() async {
+    try {
+      await _androidTimerChannel.invokeMethod('stopForegroundTimer');
+
+      // UI 업데이트 타이머도 정지
+      _mainTimer?.cancel();
+      _scheduledNotification?.cancel();
+
+      if (kDebugMode) {
+        print('Android Foreground Service stopped');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to stop Android Foreground Service: $e');
+      }
+      // 실패 시 기존 방식으로 처리
+      _mainTimer?.cancel();
+      _scheduledNotification?.cancel();
+      _disableBackground();
+    }
+  }
+
+  /// Android Foreground Service 실행 상태 확인
+  Future<bool> isAndroidForegroundServiceRunning() async {
+    if (!Platform.isAndroid) return false;
+
+    try {
+      final result = await _androidTimerChannel.invokeMethod('isForegroundTimerRunning');
+      return result as bool? ?? false;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to check Android Foreground Service status: $e');
+      }
+      return false;
+    }
+  }
+
+  /// Android 완료 후 상태 정리 (중복 UI 처리 방지)
+  void _clearAndResetAfterCompletion() {
+    // 완료 상태를 즉시 알림 (UI가 완료를 감지할 수 있도록)
+    _saveState();
+    _notifyStateChange();
+
+    if (kDebugMode) {
+      print('Android: Timer completed, ready for nextMode() call');
+    }
+
+    // nextMode() 호출을 위해 완료 상태 유지
+    // 상태 정리는 nextMode() 호출 후에 이루어짐
+  }
+
+
   /// 리소스 정리
   void dispose() {
-    _mainTimer?.cancel();
-    _scheduledNotification?.cancel();
-    _disableBackground();
+    if (Platform.isAndroid) {
+      _stopAndroidForegroundService();
+    } else {
+      _mainTimer?.cancel();
+      _scheduledNotification?.cancel();
+      _disableBackground();
+    }
     _stateController.close();
     _notificationService.dispose();
   }
