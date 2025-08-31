@@ -1,0 +1,47 @@
+<svg width="600" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="600" height="300" fill="#f8f9fa" stroke="#e9ecef" stroke-width="2" rx="10"/>
+  
+  <!-- Provider Box -->
+  <rect x="50" y="50" width="140" height="80" fill="#4CAF50" stroke="#2E7D32" stroke-width="2" rx="8"/>
+  <text x="120" y="85" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Provider</text>
+  <text x="120" y="105" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="12">(상태 관리)</text>
+  
+  <!-- Service Box -->
+  <rect x="230" y="50" width="140" height="80" fill="#2196F3" stroke="#1565C0" stroke-width="2" rx="8"/>
+  <text x="300" y="85" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Service</text>
+  <text x="300" y="105" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="12">(비즈니스 로직)</text>
+  
+  <!-- Storage Box -->
+  <rect x="410" y="50" width="140" height="80" fill="#FF9800" stroke="#F57C00" stroke-width="2" rx="8"/>
+  <text x="480" y="85" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Storage</text>
+  <text x="480" y="105" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="12">(데이터 저장)</text>
+  
+  <!-- UI Widgets Box -->
+  <rect x="200" y="180" width="200" height="80" fill="#9C27B0" stroke="#6A1B9A" stroke-width="2" rx="8"/>
+  <text x="300" y="215" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">UI Widgets</text>
+  <text x="300" y="235" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="12">(화면 표시)</text>
+  
+  <!-- Arrows -->
+  <!-- Provider <-> Service -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+  </defs>
+  
+  <line x1="190" y1="90" x2="230" y2="90" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="230" y1="100" x2="190" y2="100" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Service <-> Storage -->
+  <line x1="370" y1="90" x2="410" y2="90" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="410" y1="100" x2="370" y2="100" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Provider -> UI -->
+  <line x1="120" y1="130" x2="270" y2="180" stroke="#666" stroke-width="3" marker-end="url(#arrowhead)"/>
+  
+  <!-- Labels for arrows -->
+  <text x="210" y="85" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="10">↔</text>
+  <text x="390" y="85" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="10">↔</text>
+  <text x="180" y="160" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="10">상태 변화</text>
+</svg>
