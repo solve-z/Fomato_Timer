@@ -439,9 +439,11 @@ class TimerService {
       await prefs.setString('timer_mode', _currentMode.toString());
       await prefs.setInt('timer_round', _currentRound);
       await prefs.setString('timer_farm_id', _selectedFarmId ?? '');
-      
+
       if (kDebugMode) {
-        print('SAVE STATE: mode=$_currentMode, round=$_currentRound, remaining=$_remainingSeconds, total=$_totalSeconds, paused=$_isPaused, startTime=${_startTime?.toIso8601String()}');
+        print(
+          'SAVE STATE: mode=$_currentMode, round=$_currentRound, remaining=$_remainingSeconds, total=$_totalSeconds, paused=$_isPaused, startTime=${_startTime?.toIso8601String()}',
+        );
       }
     } catch (e) {
       if (kDebugMode) {
@@ -460,7 +462,7 @@ class TimerService {
       final savedMode = prefs.getString('timer_mode');
       final savedRound = prefs.getInt('timer_round');
       final savedRemaining = prefs.getInt('timer_remaining_seconds');
-      
+
       if ((startTimeStr == null || startTimeStr.isEmpty) && (savedMode == null || savedRound == null)) {
         // 진짜 저장된 타이머 없음 - 초기 상태 유지
         _notifyStateChange();
@@ -473,7 +475,7 @@ class TimerService {
       } else {
         _startTime = null; // 완료 상태의 경우
       }
-      
+
       final modeStr = prefs.getString('timer_mode');
       if (modeStr != null) {
         _currentMode = TimerMode.values.firstWhere((mode) => mode.toString() == modeStr, orElse: () => TimerMode.focus);
@@ -483,14 +485,16 @@ class TimerService {
 
       _currentRound = prefs.getInt('timer_round') ?? 1;
       _selectedFarmId = prefs.getString('timer_farm_id');
-      
+
       // 모드가 복원된 후 시간 정보 복원
       _totalSeconds = prefs.getInt('timer_total_seconds') ?? _getSecondsForMode(_currentMode);
       _remainingSeconds = prefs.getInt('timer_remaining_seconds') ?? _totalSeconds;
       _isPaused = prefs.getBool('timer_is_paused') ?? false;
-      
+
       if (kDebugMode) {
-        print('RESTORE STATE: loaded mode=$modeStr->$_currentMode, round=$_currentRound, remaining=$_remainingSeconds, total=$_totalSeconds, paused=$_isPaused, startTime=$startTimeStr');
+        print(
+          'RESTORE STATE: loaded mode=$modeStr->$_currentMode, round=$_currentRound, remaining=$_remainingSeconds, total=$_totalSeconds, paused=$_isPaused, startTime=$startTimeStr',
+        );
       }
 
       // 백그라운드에서 완료되었는지 확인 (시간 기반 계산)
@@ -506,16 +510,16 @@ class TimerService {
         if (kDebugMode) {
           print('Background completion detected - setting as completed');
         }
-        
+
         // 완료 상태로 설정하되 _startTime 유지 (완료 상태 표시를 위해)
         _remainingSeconds = 0;
         _isPaused = false;
         _mainTimer?.cancel();
         _scheduledNotification?.cancel();
-        
+
         // 완료 상태 저장
         await _saveState();
-        
+
         if (kDebugMode) {
           print('Timer completed in background: $_currentMode mode, round $_currentRound');
         }
@@ -524,10 +528,7 @@ class TimerService {
         if (Platform.isAndroid) {
           // Android: Foreground Service 재시작 확인
           final isServiceRunning = await isAndroidForegroundServiceRunning();
-          if (!isServiceRunning) {
-            // 서비스가 중단된 경우 재시작
-            _startAndroidForegroundService();
-          } else {
+          if (isServiceRunning) {
             // 서비스가 실행 중이면 UI 동기화만
             _startMainTimer();
           }
@@ -543,7 +544,9 @@ class TimerService {
 
       if (kDebugMode) {
         final state = currentState;
-        print('Timer state restored: Mode=${state.mode}, Status=${state.status}, Round=${state.currentRound}/${state.totalRounds}, Time=${state.formattedTime}');
+        print(
+          'Timer state restored: Mode=${state.mode}, Status=${state.status}, Round=${state.currentRound}/${state.totalRounds}, Time=${state.formattedTime}',
+        );
         print('Restored values: _currentMode=$_currentMode, _currentRound=$_currentRound, _remainingSeconds=$_remainingSeconds, _totalSeconds=$_totalSeconds');
       }
     } catch (e) {
@@ -850,7 +853,6 @@ class TimerService {
     // nextMode() 호출을 위해 완료 상태 유지
     // 상태 정리는 nextMode() 호출 후에 이루어짐
   }
-
 
   /// 리소스 정리
   void dispose() {

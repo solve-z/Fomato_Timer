@@ -118,8 +118,7 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
 
     // 시간 기반 중복 방지
     final now = DateTime.now();
-    if (_lastCompletedTime != null && 
-        now.difference(_lastCompletedTime!).inMilliseconds < 2000) {
+    if (_lastCompletedTime != null && now.difference(_lastCompletedTime!).inMilliseconds < 2000) {
       if (kDebugMode) {
         print('Duplicate completion detected - skipping processing');
       }
@@ -399,7 +398,6 @@ class TimerNotifier extends StateNotifier<TimerState> with WidgetsBindingObserve
       }
     }
   }
-
 
   @override
   void dispose() {
