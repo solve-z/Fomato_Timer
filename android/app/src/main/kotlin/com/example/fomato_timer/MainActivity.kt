@@ -23,11 +23,13 @@ class MainActivity : FlutterActivity() {
                     result.success("Timer started")
                 }
                 "pauseForegroundTimer" -> {
-                    pauseForegroundTimer()
+                    val remainingSeconds = call.argument<Int>("remainingSeconds") ?: 0
+                    pauseForegroundTimer(remainingSeconds)
                     result.success("Timer paused")
                 }
                 "resumeForegroundTimer" -> {
-                    resumeForegroundTimer()
+                    val remainingSeconds = call.argument<Int>("remainingSeconds") ?: 0
+                    resumeForegroundTimer(remainingSeconds)
                     result.success("Timer resumed")
                 }
                 "stopForegroundTimer" -> {
@@ -59,16 +61,18 @@ class MainActivity : FlutterActivity() {
         }
     }
     
-    private fun pauseForegroundTimer() {
+    private fun pauseForegroundTimer(remainingSeconds: Int) {
         val intent = Intent(this, TimerForegroundService::class.java).apply {
             action = TimerForegroundService.ACTION_PAUSE_TIMER
+            putExtra("remainingSeconds", remainingSeconds)
         }
         startService(intent)
     }
     
-    private fun resumeForegroundTimer() {
+    private fun resumeForegroundTimer(remainingSeconds: Int) {
         val intent = Intent(this, TimerForegroundService::class.java).apply {
             action = TimerForegroundService.ACTION_RESUME_TIMER
+            putExtra("remainingSeconds", remainingSeconds)
         }
         startService(intent)
     }

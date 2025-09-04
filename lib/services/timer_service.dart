@@ -763,13 +763,17 @@ class TimerService {
   /// Android Foreground Service 일시정지
   Future<void> _pauseAndroidForegroundService() async {
     try {
-      await _androidTimerChannel.invokeMethod('pauseForegroundTimer');
+      // 현재 남은 시간을 계산하여 Android에 전달
+      final currentRemaining = currentState.remainingSeconds;
+      await _androidTimerChannel.invokeMethod('pauseForegroundTimer', {
+        'remainingSeconds': currentRemaining,
+      });
 
       // UI 업데이트 타이머도 중지
       _mainTimer?.cancel();
 
       if (kDebugMode) {
-        print('Android Foreground Service paused');
+        print('Android Foreground Service paused with ${currentRemaining}s remaining');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -784,13 +788,17 @@ class TimerService {
   /// Android Foreground Service 재시작
   Future<void> _resumeAndroidForegroundService() async {
     try {
-      await _androidTimerChannel.invokeMethod('resumeForegroundTimer');
+      // 현재 남은 시간을 Android에 전달
+      final currentRemaining = currentState.remainingSeconds;
+      await _androidTimerChannel.invokeMethod('resumeForegroundTimer', {
+        'remainingSeconds': currentRemaining,
+      });
 
       // UI 업데이트 타이머 재시작
       _startMainTimer();
 
       if (kDebugMode) {
-        print('Android Foreground Service resumed');
+        print('Android Foreground Service resumed with ${currentRemaining}s remaining');
       }
     } catch (e) {
       if (kDebugMode) {

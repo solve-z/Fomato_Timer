@@ -61,8 +61,14 @@ class TimerForegroundService : Service() {
                     intent.getStringExtra(EXTRA_MODE) ?: "focus"
                 )
             }
-            ACTION_PAUSE_TIMER -> pauseTimer()
-            ACTION_RESUME_TIMER -> resumeTimer()
+            ACTION_PAUSE_TIMER -> {
+                val remainingSeconds = intent.getIntExtra("remainingSeconds", 0)
+                pauseTimer(remainingSeconds)
+            }
+            ACTION_RESUME_TIMER -> {
+                val remainingSeconds = intent.getIntExtra("remainingSeconds", 0)
+                resumeTimer(remainingSeconds)
+            }
             ACTION_STOP_TIMER -> stopTimer()
         }
         
@@ -123,16 +129,33 @@ class TimerForegroundService : Service() {
         showNotification(duration)
     }
     
-    private fun pauseTimer() {
+    private fun pauseTimer(flutterRemainingSeconds: Int = 0) {
         isPaused = true
         pausedTime = System.currentTimeMillis()
+        
+        // Flutter에서 전달받은 남은 시간이 있으면 사용 (동기화)
+        if (flutterRemainingSeconds > 0) {
+            // Flutter의 정확한 남은 시간으로 덮어쓰기
+            totalDurationSeconds = flutterRemainingSeconds
+            startTime = System.currentTimeMillis()  // 새로운 기준점 설정
+        }
+        
         stopUpdateRunnable()
     }
     
-    private fun resumeTimer() {
+    private fun resumeTimer(flutterRemainingSeconds: Int = 0) {
         if (isPaused) {
-            val pauseDuration = System.currentTimeMillis() - pausedTime
-            startTime += pauseDuration
+            // Flutter에서 전달받은 남은 시간이 있으면 사용 (동기화)
+            if (flutterRemainingSeconds > 0) {
+                // Flutter의 정확한 남은 시간으로 새로 시작
+                totalDurationSeconds = flutterRemainingSeconds
+                startTime = System.currentTimeMillis()
+            } else {
+                // 기존 방식: 일시정지 시간만큼 조정
+                val pauseDuration = System.currentTimeMillis() - pausedTime
+                startTime += pauseDuration
+            }
+            
             isPaused = false
             startUpdateRunnable()
         }
