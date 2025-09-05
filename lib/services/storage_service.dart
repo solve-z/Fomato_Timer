@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/farm.dart';
 import '../models/statistics.dart';
+import '../models/task.dart';
+import '../models/task_category.dart';
 
 /// 로컬 저장소 서비스
 /// 
@@ -14,6 +16,8 @@ class StorageService {
   static const String _statisticsKey = 'statistics';
   static const String _selectedFarmIdKey = 'selected_farm_id';
   static const String _timerSettingsKey = 'timer_settings';
+  static const String _tasksKey = 'tasks';
+  static const String _categoriesKey = 'categories';
 
   /// SharedPreferences 인스턴스 가져오기
   static Future<SharedPreferences> get _prefs async {
@@ -172,6 +176,73 @@ class StorageService {
   static Future<bool> loadDeveloperModeEnabled() async {
     final prefs = await _prefs;
     return prefs.getBool('developer_mode_enabled') ?? false;
+  }
+
+  // ==== 할일 데이터 관리 ====
+
+  /// 할일 목록 저장
+  static Future<void> saveTasks(List<Task> tasks) async {
+    final prefs = await _prefs;
+    final tasksJson = tasks.map((task) => task.toJson()).toList();
+    await prefs.setString(_tasksKey, jsonEncode(tasksJson));
+  }
+
+  /// 할일 목록 로드
+  static Future<List<Task>> loadTasks() async {
+    try {
+      final prefs = await _prefs;
+      final tasksString = prefs.getString(_tasksKey);
+      
+      if (tasksString == null) return [];
+      
+      final tasksJson = jsonDecode(tasksString) as List<dynamic>;
+      return tasksJson
+          .map((json) => Task.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      // 에러 발생 시 빈 리스트 반환
+      return [];
+    }
+  }
+
+  // ==== 카테고리 데이터 관리 ====
+
+  /// 카테고리 목록 저장
+  static Future<void> saveCategories(List<TaskCategory> categories) async {
+    final prefs = await _prefs;
+    final categoriesJson = categories.map((category) => category.toJson()).toList();
+    await prefs.setString(_categoriesKey, jsonEncode(categoriesJson));
+  }
+
+  /// 카테고리 목록 로드
+  static Future<List<TaskCategory>> loadCategories() async {
+    try {
+      final prefs = await _prefs;
+      final categoriesString = prefs.getString(_categoriesKey);
+      
+      if (categoriesString == null) {
+        // 카테고리가 없으면 기본 카테고리 반환
+        return TaskCategory.getDefaultCategories();
+      }
+      
+      final categoriesJson = jsonDecode(categoriesString) as List<dynamic>;
+      final categories = categoriesJson
+          .map((json) => TaskCategory.fromJson(json as Map<String, dynamic>))
+          .toList();
+      
+      // 기본 카테고리가 없으면 추가
+      final defaultCategories = TaskCategory.getDefaultCategories();
+      for (final defaultCategory in defaultCategories) {
+        if (!categories.any((category) => category.id == defaultCategory.id)) {
+          categories.add(defaultCategory);
+        }
+      }
+      
+      return categories;
+    } catch (e) {
+      // 에러 발생 시 기본 카테고리 반환
+      return TaskCategory.getDefaultCategories();
+    }
   }
 
   // ==== 데이터 관리 ====

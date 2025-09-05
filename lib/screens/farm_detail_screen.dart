@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/farm.dart';
 import '../providers/task_provider.dart';
+import 'task_detail_screen.dart';
 
 /// 농장 상세 화면
 /// 
@@ -159,15 +160,35 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                                   : null,
                             ),
                           ),
-                          subtitle: task.isCompleted && task.completedAt != null
-                              ? Text(
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (task.isCompleted && task.completedAt != null)
+                                Text(
                                   '완료: ${_formatDateTime(task.completedAt!)}',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey,
                                   ),
-                                )
-                              : null,
+                                ),
+                              if (task.dueDate != null)
+                                Text(
+                                  '마감: ${_formatDate(task.dueDate!)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: task.isOverdue ? Colors.red : Colors.orange,
+                                  ),
+                                ),
+                              if (task.subTasks.isNotEmpty)
+                                Text(
+                                  '체크리스트: ${task.completedSubTaskCount}/${task.totalSubTaskCount}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                            ],
+                          ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -183,6 +204,7 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                               ),
                             ],
                           ),
+                          onTap: () => _navigateToTaskDetail(task),
                         ),
                       );
                     },
@@ -286,5 +308,33 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
 
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.month}/${dateTime.day} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final targetDate = DateTime(date.year, date.month, date.day);
+    
+    final difference = targetDate.difference(today).inDays;
+    
+    if (difference == 0) {
+      return '오늘';
+    } else if (difference == 1) {
+      return '내일';
+    } else if (difference == -1) {
+      return '어제';
+    } else if (difference > 1) {
+      return '${difference}일 후';
+    } else {
+      return '${-difference}일 전';
+    }
+  }
+
+  void _navigateToTaskDetail(task) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TaskDetailScreen(task: task),
+      ),
+    );
   }
 }
