@@ -5,7 +5,9 @@ import '../providers/farm_provider.dart';
 import '../providers/task_provider.dart';
 import '../models/farm.dart';
 import '../models/timer_state.dart';
+import '../models/task.dart';
 import '../utils/constants.dart';
+import 'task_detail_screen.dart';
 
 /// 타이머 메인 화면
 ///
@@ -455,35 +457,178 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
 
                         return Column(
                           children:
-                              farmTasks.take(3).map((task) {
-                                return ListTile(
-                                  dense: true,
-                                  leading: Icon(
-                                    task.isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                                    color: task.isCompleted ? Colors.green : Colors.grey,
-                                    size: 20,
-                                  ),
-                                  title: Text(
-                                    task.title,
-                                    style: TextStyle(
-                                      decoration: task.isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
-                                      color: task.isCompleted ? Colors.grey : null,
-                                      fontSize: 14,
+                              farmTasks.take(5).map((task) {
+                                final category = task.categoryId != null 
+                                    ? ref.watch(categoryByIdProvider(task.categoryId!))
+                                    : null;
+                                    
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 4),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border(
+                                      left: BorderSide(
+                                        color: _getStatusColor(task.status),
+                                        width: 3,
+                                      ),
                                     ),
                                   ),
-                                  onTap: () {
-                                    ref.read(taskListProvider.notifier).toggleTask(task.id);
-                                  },
+                                  child: ListTile(
+                                    dense: true,
+                                    leading: Icon(
+                                      task.isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                                      color: task.isCompleted ? Colors.green : Colors.grey,
+                                      size: 20,
+                                    ),
+                                    title: Row(
+                                      children: [
+                                        // 카테고리 표시
+                                        if (category != null) ...[
+                                          Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              color: Color(int.parse(category.color.substring(1), radix: 16) + 0xFF000000),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            category.name,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                        ],
+                                        Expanded(
+                                          child: Text(
+                                            task.title,
+                                            style: TextStyle(
+                                              decoration: task.isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                                              color: task.isCompleted ? Colors.grey : null,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // 체크리스트 진행률 표시
+                                        if (task.subTasks.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: LinearProgressIndicator(
+                                                  value: task.subTaskProgress,
+                                                  backgroundColor: Colors.grey.shade300,
+                                                  valueColor: AlwaysStoppedAnimation(
+                                                    _getStatusColor(task.status),
+                                                  ),
+                                                  minHeight: 2,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '${task.completedSubTaskCount}/${task.totalSubTaskCount}',
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                        
+                                        // 마감일 표시
+                                        if (task.dueDate != null) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _getRelativeDateString(task.dueDate!),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: task.isOverdue 
+                                                  ? Colors.red 
+                                                  : (task.daysUntilDue != null && task.daysUntilDue! <= 1)
+                                                      ? Colors.orange 
+                                                      : Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    trailing: PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert, size: 16),
+                                      padding: EdgeInsets.zero,
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                                          value: 'detail',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.info_outline, size: 16),
+                                              SizedBox(width: 8),
+                                              Text('상세보기'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit, size: 16),
+                                              SizedBox(width: 8),
+                                              Text('수정'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete, size: 16, color: Colors.red),
+                                              SizedBox(width: 8),
+                                              Text('삭제', style: TextStyle(color: Colors.red)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      onSelected: (value) {
+                                        switch (value) {
+                                          case 'detail':
+                                            Navigator.of(context).pop();
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (context) => TaskDetailScreen(task: task),
+                                              ),
+                                            );
+                                            break;
+                                          case 'edit':
+                                            _showQuickEditTask(context, task);
+                                            break;
+                                          case 'delete':
+                                            _showDeleteConfirmation(context, task);
+                                            break;
+                                        }
+                                      },
+                                    ),
+                                    onTap: () {
+                                      ref.read(taskListProvider.notifier).toggleTask(task.id);
+                                    },
+                                  ),
                                 );
                               }).toList(),
                         );
                       },
                     ),
-                    if (ref.watch(farmTasksProvider(_selectedFarm!.id)).length > 3)
+                    if (ref.watch(farmTasksProvider(_selectedFarm!.id)).length > 5)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
-                          '+ ${ref.watch(farmTasksProvider(_selectedFarm!.id)).length - 3}개 더',
+                          '+ ${ref.watch(farmTasksProvider(_selectedFarm!.id)).length - 5}개 더',
                           style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                         ),
                       ),
@@ -545,6 +690,93 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
               ),
             ],
           ),
+    );
+  }
+
+  /// 상태에 따른 색상 반환
+  Color _getStatusColor(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.inProgress:
+        return Colors.blue;
+      case TaskStatus.completed:
+        return Colors.green;
+      case TaskStatus.cancelled:
+        return Colors.red;
+    }
+  }
+
+  /// 상대적인 날짜 문자열 반환
+  String _getRelativeDateString(DateTime dueDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final targetDate = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    
+    final difference = targetDate.difference(today).inDays;
+    
+    if (difference == 0) {
+      return '오늘';
+    } else if (difference == 1) {
+      return '내일';
+    } else if (difference == -1) {
+      return '어제';
+    } else if (difference > 1) {
+      return '${difference}일 후';
+    } else {
+      return '${-difference}일 지남';
+    }
+  }
+
+  /// 빠른 할일 수정 다이얼로그
+  void _showQuickEditTask(BuildContext context, Task task) {
+    final taskController = TextEditingController(text: task.title);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('할일 수정'),
+        content: TextField(
+          controller: taskController,
+          decoration: const InputDecoration(labelText: '할일 제목', border: OutlineInputBorder()),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
+          TextButton(
+            onPressed: () {
+              if (taskController.text.trim().isNotEmpty) {
+                ref.read(taskListProvider.notifier).updateTask(
+                  task.id,
+                  title: taskController.text.trim(),
+                );
+              }
+              Navigator.of(context).pop();
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 할일 삭제 확인 다이얼로그
+  void _showDeleteConfirmation(BuildContext context, Task task) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('할일 삭제'),
+        content: Text('"${task.title}"을(를) 삭제하시겠습니까?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
+          TextButton(
+            onPressed: () {
+              ref.read(taskListProvider.notifier).deleteTask(task.id);
+              Navigator.of(context).pop();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
     );
   }
 

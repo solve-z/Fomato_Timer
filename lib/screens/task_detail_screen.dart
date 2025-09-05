@@ -24,7 +24,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   late Task _currentTask;
   DateTime? _selectedDueDate;
   String? _selectedCategoryId;
-  TaskStatus _selectedStatus = TaskStatus.todo;
+  TaskStatus _selectedStatus = TaskStatus.inProgress;
 
   @override
   void initState() {
@@ -392,14 +392,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   Color _getStatusColor(TaskStatus status) {
     switch (status) {
-      case TaskStatus.todo:
-        return Colors.grey;
       case TaskStatus.inProgress:
         return Colors.blue;
       case TaskStatus.completed:
         return Colors.green;
-      case TaskStatus.onHold:
-        return Colors.orange;
       case TaskStatus.cancelled:
         return Colors.red;
     }

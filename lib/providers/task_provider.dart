@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
+import '../models/task_category.dart';
 import '../services/storage_service.dart';
 
 /// 할일 목록 상태 관리 클래스
@@ -30,11 +31,7 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
   }
 
   /// 새 할일 추가
-  void addTask(String farmId, String title, {
-    DateTime? dueDate,
-    String? categoryId,
-    TaskStatus? status,
-  }) {
+  void addTask(String farmId, String title, {DateTime? dueDate, String? categoryId, TaskStatus? status}) {
     final now = DateTime.now();
     final newTask = Task(
       id: 'task-${DateTime.now().millisecondsSinceEpoch}',
@@ -42,7 +39,7 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
       title: title,
       dueDate: dueDate,
       categoryId: categoryId,
-      status: status ?? TaskStatus.todo,
+      status: status ?? TaskStatus.inProgress,
       isCompleted: false,
       createdAt: now,
       updatedAt: now,
@@ -53,28 +50,22 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
   }
 
   /// 할일 수정
-  void updateTask(String taskId, {
-    String? title,
-    String? memo,
-    DateTime? dueDate,
-    String? categoryId,
-    TaskStatus? status,
-    List<SubTask>? subTasks,
-  }) {
-    state = state.map((task) {
-      if (task.id == taskId) {
-        return task.copyWith(
-          title: title,
-          memo: memo,
-          dueDate: dueDate,
-          categoryId: categoryId,
-          status: status,
-          subTasks: subTasks,
-          updatedAt: DateTime.now(),
-        );
-      }
-      return task;
-    }).toList();
+  void updateTask(String taskId, {String? title, String? memo, DateTime? dueDate, String? categoryId, TaskStatus? status, List<SubTask>? subTasks}) {
+    state =
+        state.map((task) {
+          if (task.id == taskId) {
+            return task.copyWith(
+              title: title,
+              memo: memo,
+              dueDate: dueDate,
+              categoryId: categoryId,
+              status: status,
+              subTasks: subTasks,
+              updatedAt: DateTime.now(),
+            );
+          }
+          return task;
+        }).toList();
     _saveTasks();
   }
 
@@ -86,95 +77,83 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
 
   /// 할일 완료/미완료 토글
   void toggleTask(String taskId) {
-    state = state.map((task) {
-      if (task.id == taskId) {
-        return task.toggleComplete();
-      }
-      return task;
-    }).toList();
+    state =
+        state.map((task) {
+          if (task.id == taskId) {
+            return task.toggleComplete();
+          }
+          return task;
+        }).toList();
     _saveTasks();
   }
 
   /// 서브태스크 추가
   void addSubTask(String taskId, String subTaskTitle) {
     final now = DateTime.now();
-    final newSubTask = SubTask(
-      id: 'subtask-${now.millisecondsSinceEpoch}',
-      title: subTaskTitle,
-      isCompleted: false,
-      createdAt: now,
-    );
+    final newSubTask = SubTask(id: 'subtask-${now.millisecondsSinceEpoch}', title: subTaskTitle, isCompleted: false, createdAt: now);
 
-    state = state.map((task) {
-      if (task.id == taskId) {
-        final updatedSubTasks = [...task.subTasks, newSubTask];
-        return task.copyWith(
-          subTasks: updatedSubTasks,
-          updatedAt: now,
-        );
-      }
-      return task;
-    }).toList();
+    state =
+        state.map((task) {
+          if (task.id == taskId) {
+            final updatedSubTasks = [...task.subTasks, newSubTask];
+            return task.copyWith(subTasks: updatedSubTasks, updatedAt: now);
+          }
+          return task;
+        }).toList();
     _saveTasks();
   }
 
   /// 서브태스크 완료/미완료 토글
   void toggleSubTask(String taskId, String subTaskId) {
     final now = DateTime.now();
-    state = state.map((task) {
-      if (task.id == taskId) {
-        final updatedSubTasks = task.subTasks.map((subTask) {
-          if (subTask.id == subTaskId) {
-            return subTask.copyWith(isCompleted: !subTask.isCompleted);
+    state =
+        state.map((task) {
+          if (task.id == taskId) {
+            final updatedSubTasks =
+                task.subTasks.map((subTask) {
+                  if (subTask.id == subTaskId) {
+                    return subTask.copyWith(isCompleted: !subTask.isCompleted);
+                  }
+                  return subTask;
+                }).toList();
+            return task.copyWith(subTasks: updatedSubTasks, updatedAt: now);
           }
-          return subTask;
+          return task;
         }).toList();
-        return task.copyWith(
-          subTasks: updatedSubTasks,
-          updatedAt: now,
-        );
-      }
-      return task;
-    }).toList();
     _saveTasks();
   }
 
   /// 서브태스크 수정
   void updateSubTask(String taskId, String subTaskId, String newTitle) {
     final now = DateTime.now();
-    state = state.map((task) {
-      if (task.id == taskId) {
-        final updatedSubTasks = task.subTasks.map((subTask) {
-          if (subTask.id == subTaskId) {
-            return subTask.copyWith(title: newTitle);
+    state =
+        state.map((task) {
+          if (task.id == taskId) {
+            final updatedSubTasks =
+                task.subTasks.map((subTask) {
+                  if (subTask.id == subTaskId) {
+                    return subTask.copyWith(title: newTitle);
+                  }
+                  return subTask;
+                }).toList();
+            return task.copyWith(subTasks: updatedSubTasks, updatedAt: now);
           }
-          return subTask;
+          return task;
         }).toList();
-        return task.copyWith(
-          subTasks: updatedSubTasks,
-          updatedAt: now,
-        );
-      }
-      return task;
-    }).toList();
     _saveTasks();
   }
 
   /// 서브태스크 삭제
   void deleteSubTask(String taskId, String subTaskId) {
     final now = DateTime.now();
-    state = state.map((task) {
-      if (task.id == taskId) {
-        final updatedSubTasks = task.subTasks
-            .where((subTask) => subTask.id != subTaskId)
-            .toList();
-        return task.copyWith(
-          subTasks: updatedSubTasks,
-          updatedAt: now,
-        );
-      }
-      return task;
-    }).toList();
+    state =
+        state.map((task) {
+          if (task.id == taskId) {
+            final updatedSubTasks = task.subTasks.where((subTask) => subTask.id != subTaskId).toList();
+            return task.copyWith(subTasks: updatedSubTasks, updatedAt: now);
+          }
+          return task;
+        }).toList();
     _saveTasks();
   }
 
@@ -257,4 +236,46 @@ final dateCompletedTasksProvider = Provider.family<List<Task>, Map<String, dynam
 
     return true;
   }).toList();
+});
+
+/// 카테고리 목록 상태 관리 클래스
+class CategoryListNotifier extends StateNotifier<List<TaskCategory>> {
+  CategoryListNotifier() : super([]) {
+    _loadCategories();
+  }
+
+  /// 저장된 카테고리 데이터 로드
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await StorageService.loadCategories();
+      state = categories.isEmpty ? TaskCategory.getDefaultCategories() : categories;
+    } catch (e) {
+      // 로드 실패 시 기본 카테고리로 초기화
+      state = TaskCategory.getDefaultCategories();
+    }
+  }
+
+  /// 카테고리 목록 저장
+  Future<void> _saveCategories() async {
+    try {
+      await StorageService.saveCategories(state);
+    } catch (e) {
+      print('카테고리 저장 실패: $e');
+    }
+  }
+}
+
+/// 카테고리 목록 Provider
+final categoryListProvider = StateNotifierProvider<CategoryListNotifier, List<TaskCategory>>((ref) {
+  return CategoryListNotifier();
+});
+
+/// ID로 특정 카테고리 찾기 Provider
+final categoryByIdProvider = Provider.family<TaskCategory?, String>((ref, categoryId) {
+  final categories = ref.watch(categoryListProvider);
+  try {
+    return categories.firstWhere((category) => category.id == categoryId);
+  } catch (e) {
+    return null;
+  }
 });

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/farm_provider.dart';
+import '../providers/task_provider.dart';
 import '../models/farm.dart';
+import '../models/task.dart';
 import 'farm_detail_screen.dart';
 
 /// 농장 관리 화면
@@ -82,14 +84,17 @@ class FarmScreen extends ConsumerWidget {
       itemBuilder: (context, index) {
         final farm = farmList[index];
         final isSelected = selectedFarm?.id == farm.id;
+        final farmTasks = ref.watch(farmTasksProvider(farm.id));
+        final inProgressCount = farmTasks.where((task) => task.status == TaskStatus.inProgress).length;
+        final completedCount = farmTasks.where((task) => task.status == TaskStatus.completed).length;
         
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          elevation: isSelected ? 4 : 2,
+          elevation: isSelected ? 3 : 1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: isSelected 
-                ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
+                ? BorderSide(color: Color(int.parse(farm.color.substring(1), radix: 16) + 0xFF000000), width: 2)
                 : BorderSide.none,
           ),
           child: InkWell(
@@ -108,61 +113,83 @@ class FarmScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 농장 헤더
+                  // 농장 헤더 (농장명 + 토마토 배지)
                   Row(
                     children: [
+                      // 농장 색상 점
                       Container(
-                        width: 20,
-                        height: 20,
+                        width: 16,
+                        height: 16,
                         decoration: BoxDecoration(
                           color: Color(int.parse(farm.color.substring(1), radix: 16) + 0xFF000000),
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
+                      
+                      // 농장명
                       Expanded(
                         child: Text(
                           farm.name,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                           ),
                         ),
                       ),
-                      if (isSelected)
-                        Icon(
-                          Icons.check_circle,
-                          color: Theme.of(context).primaryColor,
-                          size: 20,
+                      
+                      // 토마토 배지
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('🍅', style: TextStyle(fontSize: 12)),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${farm.tomatoCount}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
 
-                  // 토마토 수확 현황
+                  // 할일 요약
                   Row(
                     children: [
-                      const Icon(Icons.eco, size: 16, color: Colors.green),
-                      const SizedBox(width: 4),
                       Text(
-                        '토마토 ${farm.tomatoCount}개 수확',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.green.shade700,
+                        '진행중 ${inProgressCount}개',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade600,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const Spacer(),
+                      Text(' · ', style: TextStyle(color: Colors.grey.shade400)),
                       Text(
-                        '${farm.tomatoCount * 25}분 집중',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
+                        '완료 ${completedCount}개',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.green.shade600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
 
-                  // 잔디형 시각화 (간단한 버전)
-                  _buildTomatoVisualization(farm.tomatoCount),
+                  // 7일간 활동 시각화
+                  _build7DayActivity(farm.tomatoCount),
                 ],
               ),
             ),
@@ -172,7 +199,58 @@ class FarmScreen extends ConsumerWidget {
     );
   }
 
-  /// 토마토 수확 시각화 (잔디형)
+  /// 7일간 활동 시각화 (간소화된 잔디형)
+  Widget _build7DayActivity(int tomatoCount) {
+    const double itemSize = 16;
+    const double spacing = 4;
+    const int days = 7;
+
+    // 최근 7일간의 활동 시뮬레이션 (실제로는 날짜별 데이터를 가져와야 함)
+    final activityLevels = List.generate(days, (index) {
+      // 간단한 시뮬레이션: 토마토 개수를 7일로 분산
+      final baseActivity = (tomatoCount / days).floor();
+      final extra = (index < tomatoCount % days) ? 1 : 0;
+      return baseActivity + extra;
+    });
+
+    return Row(
+      children: [
+        Text(
+          '최근 7일:',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: activityLevels.asMap().entries.map((entry) {
+              final activity = entry.value;
+              final intensity = activity > 0 
+                  ? (activity > 3 ? 0.8 : activity > 1 ? 0.5 : 0.2)
+                  : 0.0;
+              
+              return Container(
+                width: itemSize,
+                height: itemSize,
+                decoration: BoxDecoration(
+                  color: intensity > 0 
+                      ? Colors.green.withValues(alpha: intensity)
+                      : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 토마토 수확 시각화 (잔디형) - 기존 메서드 유지
   Widget _buildTomatoVisualization(int tomatoCount) {
     const int maxItemsPerRow = 10;
     const int maxRows = 3;

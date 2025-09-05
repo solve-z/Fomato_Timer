@@ -1,9 +1,7 @@
 /// 할일 상태 열거형
 enum TaskStatus {
-  todo('할 일'),
-  inProgress('진행 중'),
+  inProgress('진행중'),
   completed('완료'),
-  onHold('보류'),
   cancelled('취소');
 
   const TaskStatus(this.label);
@@ -81,7 +79,7 @@ class Task {
     this.memo = '',
     this.dueDate,
     this.categoryId,
-    this.status = TaskStatus.todo,
+    this.status = TaskStatus.inProgress,
     this.subTasks = const [],
     required this.isCompleted,
     required this.createdAt,
@@ -101,8 +99,8 @@ class Task {
           : null,
       categoryId: json['categoryId'] as String?,
       status: TaskStatus.values.firstWhere(
-        (status) => status.name == (json['status'] as String? ?? 'todo'),
-        orElse: () => TaskStatus.todo,
+        (status) => status.name == (json['status'] as String? ?? 'inProgress'),
+        orElse: () => TaskStatus.inProgress,
       ),
       subTasks: (json['subTasks'] as List<dynamic>? ?? [])
           .map((subTaskJson) => SubTask.fromJson(subTaskJson as Map<String, dynamic>))
@@ -168,7 +166,7 @@ class Task {
   /// 할일 완료/미완료 토글
   Task toggleComplete() {
     final now = DateTime.now();
-    final newStatus = isCompleted ? TaskStatus.todo : TaskStatus.completed;
+    final newStatus = isCompleted ? TaskStatus.inProgress : TaskStatus.completed;
     return copyWith(
       isCompleted: !isCompleted,
       status: newStatus,
