@@ -9,6 +9,7 @@ import '../providers/statistics_provider.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import '../models/timer_state.dart';
+import 'tag_management_screen.dart';
 
 /// 설정 화면
 /// 
@@ -52,6 +53,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // 사운드 & 알림 설정 섹션
           _buildSectionHeader(context, '사운드 & 알림'),
           _buildSoundSettingsCard(context, ref),
+          const SizedBox(height: 20),
+
+          // 태그 관리 섹션
+          _buildSectionHeader(context, '태그 관리'),
+          _buildTagManagementCard(context),
           const SizedBox(height: 20),
 
           // 개발자 모드 섹션 (활성화된 경우만 표시)
@@ -276,6 +282,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onChanged: enabled ? onChanged : null,
         ),
       ],
+    );
+  }
+
+  /// 태그 관리 카드
+  Widget _buildTagManagementCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListTile(
+          leading: const Icon(Icons.local_offer),
+          title: const Text('태그 관리'),
+          subtitle: const Text('할일에 사용할 태그를 추가, 수정, 삭제할 수 있습니다'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const TagManagementScreen(),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 

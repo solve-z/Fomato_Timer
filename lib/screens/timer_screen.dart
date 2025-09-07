@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/timer_provider.dart';
 import '../providers/farm_provider.dart';
 import '../providers/task_provider.dart';
+import '../widgets/task_tags_widget.dart';
 import '../models/farm.dart';
 import '../models/timer_state.dart';
 import '../models/task.dart';
@@ -426,10 +427,6 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
                         return Column(
                           children:
                               farmTasks.take(5).map((task) {
-                                final category = task.categoryId != null 
-                                    ? ref.watch(categoryByIdProvider(task.categoryId!))
-                                    : null;
-                                    
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 4),
                                   decoration: BoxDecoration(
@@ -448,43 +445,27 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
                                       color: task.isCompleted ? Colors.green : Colors.grey,
                                       size: 20,
                                     ),
-                                    title: Row(
-                                      children: [
-                                        // 카테고리 표시
-                                        if (category != null) ...[
-                                          Container(
-                                            width: 6,
-                                            height: 6,
-                                            decoration: BoxDecoration(
-                                              color: Color(int.parse(category.color.substring(1), radix: 16) + 0xFF000000),
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            category.name,
-                                            style: const TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                        ],
-                                        Expanded(
-                                          child: Text(
-                                            task.title,
-                                            style: TextStyle(
-                                              decoration: task.isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
-                                              color: task.isCompleted ? Colors.grey : null,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                    title: Text(
+                                      task.title,
+                                      style: TextStyle(
+                                        decoration: task.isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                                        color: task.isCompleted ? Colors.grey : null,
+                                        fontSize: 14,
+                                      ),
                                     ),
                                     subtitle: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
+                                        // 태그 표시
+                                        if (task.tagIds.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          TaskTagsWidget(
+                                            tagIds: task.tagIds,
+                                            chipHeight: 16,
+                                            maxTags: 2,
+                                          ),
+                                        ],
+                                        
                                         // 체크리스트 진행률 표시
                                         if (task.subTasks.isNotEmpty) ...[
                                           const SizedBox(height: 2),

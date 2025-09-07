@@ -64,7 +64,7 @@ class Task {
   final String title;        // 할일 제목
   final String memo;         // 메모
   final DateTime? dueDate;   // 마감일
-  final String? categoryId;  // 카테고리 ID
+  final List<String> tagIds;  // 태그 ID 목록
   final TaskStatus status;   // 현재 상태
   final List<SubTask> subTasks;   // 체크리스트
   final bool isCompleted;    // 완료 여부 (호환성 유지)
@@ -78,7 +78,7 @@ class Task {
     required this.title,
     this.memo = '',
     this.dueDate,
-    this.categoryId,
+    this.tagIds = const [],
     this.status = TaskStatus.inProgress,
     this.subTasks = const [],
     required this.isCompleted,
@@ -97,7 +97,7 @@ class Task {
       dueDate: json['dueDate'] != null 
           ? DateTime.parse(json['dueDate'] as String) 
           : null,
-      categoryId: json['categoryId'] as String?,
+      tagIds: (json['tagIds'] as List<dynamic>? ?? []).cast<String>(),
       status: TaskStatus.values.firstWhere(
         (status) => status.name == (json['status'] as String? ?? 'inProgress'),
         orElse: () => TaskStatus.inProgress,
@@ -122,7 +122,7 @@ class Task {
       'title': title,
       'memo': memo,
       'dueDate': dueDate?.toIso8601String(),
-      'categoryId': categoryId,
+      'tagIds': tagIds,
       'status': status.name,
       'subTasks': subTasks.map((subTask) => subTask.toJson()).toList(),
       'isCompleted': isCompleted,
@@ -139,7 +139,7 @@ class Task {
     String? title,
     String? memo,
     DateTime? dueDate,
-    String? categoryId,
+    List<String>? tagIds,
     TaskStatus? status,
     List<SubTask>? subTasks,
     bool? isCompleted,
@@ -153,7 +153,7 @@ class Task {
       title: title ?? this.title,
       memo: memo ?? this.memo,
       dueDate: dueDate ?? this.dueDate,
-      categoryId: categoryId ?? this.categoryId,
+      tagIds: tagIds ?? this.tagIds,
       status: status ?? this.status,
       subTasks: subTasks ?? this.subTasks,
       isCompleted: isCompleted ?? this.isCompleted,
@@ -204,6 +204,37 @@ class Task {
     if (dueDate == null || isCompleted) return false;
     final now = DateTime.now();
     return dueDate!.isBefore(DateTime(now.year, now.month, now.day));
+  }
+
+  /// 태그 추가
+  Task addTag(String tagId) {
+    if (tagIds.contains(tagId)) return this;
+    return copyWith(
+      tagIds: [...tagIds, tagId],
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  /// 태그 제거
+  Task removeTag(String tagId) {
+    if (!tagIds.contains(tagId)) return this;
+    return copyWith(
+      tagIds: tagIds.where((id) => id != tagId).toList(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  /// 태그 목록 설정
+  Task setTags(List<String> newTagIds) {
+    return copyWith(
+      tagIds: List.from(newTagIds),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  /// 특정 태그를 가지고 있는지 확인
+  bool hasTag(String tagId) {
+    return tagIds.contains(tagId);
   }
 
   @override

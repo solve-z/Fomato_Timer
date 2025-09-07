@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/farm.dart';
 import '../models/task.dart';
 import '../providers/task_provider.dart';
+import '../widgets/tag_selector_widget.dart';
+import '../widgets/task_tags_widget.dart';
 import 'task_detail_screen.dart';
 
 /// 할일 필터 옵션
@@ -38,7 +40,7 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
   // 고급 옵션 상태
   bool _showAdvancedOptions = false;
   DateTime? _selectedDueDate;
-  String? _selectedCategoryId;
+  List<String> _selectedTagIds = [];
 
   @override
   void dispose() {
@@ -192,54 +194,14 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                       const SizedBox(height: 8),
                       
                       // 카테고리 선택
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.label_outline, size: 18),
-                              const SizedBox(width: 8),
-                              const Text('카테고리:'),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Consumer(
-                            builder: (context, ref, child) {
-                              final categories = ref.watch(categoryListProvider);
-                              return Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                children: categories.map((category) {
-                                  final isSelected = _selectedCategoryId == category.id;
-                                  return ChoiceChip(
-                                    label: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: BoxDecoration(
-                                            color: Color(int.parse(category.color.substring(1), radix: 16) + 0xFF000000),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(category.name),
-                                      ],
-                                    ),
-                                    selected: isSelected,
-                                    selectedColor: Color(int.parse(category.color.substring(1), radix: 16) + 0xFF000000).withValues(alpha: 0.2),
-                                    onSelected: (selected) {
-                                      setState(() {
-                                        _selectedCategoryId = selected ? category.id : null;
-                                      });
-                                    },
-                                  );
-                                }).toList(),
-                              );
-                            },
-                          ),
-                        ],
+                      TagSelectorWidget(
+                        title: '태그',
+                        selectedTagIds: _selectedTagIds,
+                        onTagsChanged: (newTagIds) {
+                          setState(() {
+                            _selectedTagIds = newTagIds;
+                          });
+                        },
                       ),
                     ],
                     
@@ -290,9 +252,6 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                     itemCount: filteredTasks.length,
                     itemBuilder: (context, index) {
                       final task = filteredTasks[index];
-                      final category = task.categoryId != null 
-                          ? ref.watch(categoryByIdProvider(task.categoryId!))
-                          : null;
                       
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -314,49 +273,26 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                               },
                               activeColor: Color(int.parse(widget.farm.color.substring(1), radix: 16) + 0xFF000000),
                             ),
-                            title: Row(
-                              children: [
-                                // 카테고리 표시
-                                if (category != null) ...[
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: Color(int.parse(category.color.substring(1), radix: 16) + 0xFF000000),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    category.name,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                Expanded(
-                                  child: Text(
-                                    task.title,
-                                    style: TextStyle(
-                                      decoration: task.isCompleted
-                                          ? TextDecoration.lineThrough
-                                          : TextDecoration.none,
-                                      color: task.isCompleted
-                                          ? Colors.grey
-                                          : null,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            title: Text(
+                              task.title,
+                              style: TextStyle(
+                                decoration: task.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : TextDecoration.none,
+                                color: task.isCompleted
+                                    ? Colors.grey
+                                    : null,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 4),
+                                
+                                // 태그 표시
+                                TaskTagsWidget(tagIds: task.tagIds),
+                                const SizedBox(height: 4),
                                 
                                 // 체크리스트 진행률 프로그레스 바
                                 if (task.subTasks.isNotEmpty) ...[
@@ -532,14 +468,14 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
         widget.farm.id, 
         _taskController.text.trim(),
         dueDate: _selectedDueDate,
-        categoryId: _selectedCategoryId,
+        tagIds: _selectedTagIds,
       );
       
       // 입력 필드 및 옵션 초기화
       _taskController.clear();
       setState(() {
         _selectedDueDate = null;
-        _selectedCategoryId = null;
+        _selectedTagIds = [];
         _showAdvancedOptions = false;
       });
     }

@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
-import '../models/task_category.dart';
 import '../services/storage_service.dart';
 
 /// 할일 목록 상태 관리 클래스
@@ -31,14 +30,14 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
   }
 
   /// 새 할일 추가
-  void addTask(String farmId, String title, {DateTime? dueDate, String? categoryId, TaskStatus? status}) {
+  void addTask(String farmId, String title, {DateTime? dueDate, List<String>? tagIds, TaskStatus? status}) {
     final now = DateTime.now();
     final newTask = Task(
       id: 'task-${DateTime.now().millisecondsSinceEpoch}',
       farmId: farmId,
       title: title,
       dueDate: dueDate,
-      categoryId: categoryId,
+      tagIds: tagIds ?? [],
       status: status ?? TaskStatus.inProgress,
       isCompleted: false,
       createdAt: now,
@@ -50,7 +49,7 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
   }
 
   /// 할일 수정
-  void updateTask(String taskId, {String? title, String? memo, DateTime? dueDate, String? categoryId, TaskStatus? status, List<SubTask>? subTasks}) {
+  void updateTask(String taskId, {String? title, String? memo, DateTime? dueDate, List<String>? tagIds, TaskStatus? status, List<SubTask>? subTasks}) {
     state =
         state.map((task) {
           if (task.id == taskId) {
@@ -58,7 +57,7 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
               title: title,
               memo: memo,
               dueDate: dueDate,
-              categoryId: categoryId,
+              tagIds: tagIds,
               status: status,
               subTasks: subTasks,
               updatedAt: DateTime.now(),
@@ -190,6 +189,44 @@ class TaskListNotifier extends StateNotifier<List<Task>> {
       return true;
     }).toList();
   }
+
+  /// 특정 태그를 가진 할일 목록 반환
+  List<Task> getTasksByTagId(String tagId) {
+    return state.where((task) => task.tagIds.contains(tagId)).toList();
+  }
+
+  /// 모든 할일에서 특정 태그 제거
+  void removeTagFromAllTasks(String tagId) {
+    state = state.map((task) {
+      if (task.tagIds.contains(tagId)) {
+        return task.removeTag(tagId);
+      }
+      return task;
+    }).toList();
+    _saveTasks();
+  }
+
+  /// 특정 할일에 태그 추가
+  void addTagToTask(String taskId, String tagId) {
+    state = state.map((task) {
+      if (task.id == taskId) {
+        return task.addTag(tagId);
+      }
+      return task;
+    }).toList();
+    _saveTasks();
+  }
+
+  /// 특정 할일에서 태그 제거
+  void removeTagFromTask(String taskId, String tagId) {
+    state = state.map((task) {
+      if (task.id == taskId) {
+        return task.removeTag(tagId);
+      }
+      return task;
+    }).toList();
+    _saveTasks();
+  }
 }
 
 /// 할일 목록 Provider
@@ -238,44 +275,15 @@ final dateCompletedTasksProvider = Provider.family<List<Task>, Map<String, dynam
   }).toList();
 });
 
-/// 카테고리 목록 상태 관리 클래스
-class CategoryListNotifier extends StateNotifier<List<TaskCategory>> {
-  CategoryListNotifier() : super([]) {
-    _loadCategories();
-  }
-
-  /// 저장된 카테고리 데이터 로드
-  Future<void> _loadCategories() async {
-    try {
-      final categories = await StorageService.loadCategories();
-      state = categories.isEmpty ? TaskCategory.getDefaultCategories() : categories;
-    } catch (e) {
-      // 로드 실패 시 기본 카테고리로 초기화
-      state = TaskCategory.getDefaultCategories();
-    }
-  }
-
-  /// 카테고리 목록 저장
-  Future<void> _saveCategories() async {
-    try {
-      await StorageService.saveCategories(state);
-    } catch (e) {
-      print('카테고리 저장 실패: $e');
-    }
-  }
-}
-
-/// 카테고리 목록 Provider
-final categoryListProvider = StateNotifierProvider<CategoryListNotifier, List<TaskCategory>>((ref) {
-  return CategoryListNotifier();
+/// 특정 태그를 가진 할일 목록 Provider
+final tasksByTagProvider = Provider.family<List<Task>, String>((ref, tagId) {
+  final tasks = ref.watch(taskListProvider);
+  return tasks.where((task) => task.tagIds.contains(tagId)).toList();
 });
 
-/// ID로 특정 카테고리 찾기 Provider
-final categoryByIdProvider = Provider.family<TaskCategory?, String>((ref, categoryId) {
-  final categories = ref.watch(categoryListProvider);
-  try {
-    return categories.firstWhere((category) => category.id == categoryId);
-  } catch (e) {
-    return null;
-  }
+/// 태그별 할일 개수 Provider
+final taskCountByTagProvider = Provider.family<int, String>((ref, tagId) {
+  final tasks = ref.watch(taskListProvider);
+  return tasks.where((task) => task.tagIds.contains(tagId)).length;
 });
+

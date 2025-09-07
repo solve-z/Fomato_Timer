@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
-import '../models/task_category.dart';
 import '../providers/task_provider.dart';
+import '../widgets/tag_selector_widget.dart';
 
 /// 할일 상세 화면
 ///
@@ -23,7 +23,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   late Task _currentTask;
   DateTime? _selectedDueDate;
-  String? _selectedCategoryId;
+  List<String> _selectedTagIds = [];
   TaskStatus _selectedStatus = TaskStatus.inProgress;
 
   @override
@@ -34,7 +34,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     _memoController = TextEditingController(text: _currentTask.memo);
     _subTaskController = TextEditingController();
     _selectedDueDate = _currentTask.dueDate;
-    _selectedCategoryId = _currentTask.categoryId;
+    _selectedTagIds = List.from(_currentTask.tagIds);
     _selectedStatus = _currentTask.status;
   }
 
@@ -86,13 +86,13 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             children: [
               _buildTitleSection(),
               const SizedBox(height: 16),
+              _buildTagSection(),
+              const SizedBox(height: 16),
               _buildStatusSection(),
               const SizedBox(height: 16),
               _buildSubTasksSection(),
               const SizedBox(height: 16),
               _buildDueDateSection(),
-              const SizedBox(height: 16),
-              _buildCategorySection(),
               const SizedBox(height: 16),
               _buildMemoSection(),
             ],
@@ -210,55 +210,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
-  Widget _buildCategorySection() {
+  Widget _buildTagSection() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('카테고리', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            FutureBuilder<List<TaskCategory>>(
-              future: _loadCategories(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const CircularProgressIndicator();
-                }
-
-                final categories = snapshot.data!;
-                return Column(
-                  children: [
-                    DropdownButtonFormField<String?>(
-                      value: _selectedCategoryId,
-                      decoration: const InputDecoration(border: OutlineInputBorder(), hintText: '카테고리 선택'),
-                      items: [
-                        const DropdownMenuItem<String?>(value: null, child: Text('카테고리 없음')),
-                        ...categories.map((category) {
-                          return DropdownMenuItem<String>(
-                            value: category.id,
-                            child: Row(
-                              children: [
-                                Icon(_getIconData(category.icon), color: Color(int.parse(category.color.substring(1), radix: 16) + 0xFF000000), size: 20),
-                                const SizedBox(width: 8),
-                                Text(category.name),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCategoryId = value;
-                        });
-                        _autoSave();
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
+        child: TagSelectorWidget(
+          title: '태그',
+          selectedTagIds: _selectedTagIds,
+          onTagsChanged: (newTagIds) {
+            setState(() {
+              _selectedTagIds = newTagIds;
+            });
+            _autoSave();
+          },
         ),
       ),
     );
@@ -382,13 +346,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
-  Future<List<TaskCategory>> _loadCategories() async {
-    try {
-      return await Future.value(TaskCategory.getDefaultCategories());
-    } catch (e) {
-      return TaskCategory.getDefaultCategories();
-    }
-  }
 
   Color _getStatusColor(TaskStatus status) {
     switch (status) {
@@ -401,24 +358,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     }
   }
 
-  IconData _getIconData(String iconName) {
-    switch (iconName) {
-      case 'school':
-        return Icons.school;
-      case 'work':
-        return Icons.work;
-      case 'person':
-        return Icons.person;
-      case 'favorite':
-        return Icons.favorite;
-      case 'palette':
-        return Icons.palette;
-      case 'attach_money':
-        return Icons.attach_money;
-      default:
-        return Icons.category;
-    }
-  }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
@@ -476,7 +415,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           title: _titleController.text.trim(),
           memo: _memoController.text.trim(),
           dueDate: _selectedDueDate,
-          categoryId: _selectedCategoryId,
+          tagIds: _selectedTagIds,
           status: _selectedStatus,
         );
   }
