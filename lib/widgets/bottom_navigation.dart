@@ -32,19 +32,19 @@ class _MainBottomNavigationState extends State<MainBottomNavigation> {
   // 각 탭의 네비게이션 정보
   final List<BottomNavigationBarItem> _navItems = [
     const BottomNavigationBarItem(
-      icon: Icon(Icons.timer, size: 28),
+      icon: Icon(Icons.timer, size: 24),
       label: '',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.grass, size: 28),
+      icon: Icon(Icons.grass, size: 24),
       label: '',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.bar_chart, size: 28),
+      icon: Icon(Icons.bar_chart, size: 24),
       label: '',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.settings, size: 28),
+      icon: Icon(Icons.settings, size: 24),
       label: '',
     ),
   ];
@@ -69,6 +69,7 @@ class _MainBottomNavigationState extends State<MainBottomNavigation> {
         showUnselectedLabels: false,
         backgroundColor: Colors.white,
         enableFeedback: false,
+        elevation: 2, // 약간의 그림자로 구분감 제공
       ),
     );
   }

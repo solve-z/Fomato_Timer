@@ -34,107 +34,109 @@ class TimerScreen extends ConsumerWidget {
               const SizedBox(height: 20),
               // 농장 선택 영역
               GestureDetector(
-              onTap: () => _showFarmSelector(context, ref),
-              child: Card(
+                onTap: () => _showFarmSelector(context, ref),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child:
+                        selectedFarm != null
+                            ? Row(
+                              children: [
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Color(int.parse(selectedFarm.color.substring(1), radix: 16) + 0xFF000000),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(child: Text(selectedFarm.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500))),
+                                Text(
+                                  '🍅 ${selectedFarm.tomatoCount}',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+                              ],
+                            )
+                            : Row(
+                              children: [
+                                Icon(Icons.grass_outlined, color: Colors.grey.shade400, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    '농장을 선택하세요...',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                  ),
+                                ),
+                                const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+                              ],
+                            ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 5),
+
+              // 메인 타이머 영역
+              Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child:
-                      selectedFarm != null
-                          ? Row(
-                            children: [
-                              Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: Color(int.parse(selectedFarm.color.substring(1), radix: 16) + 0xFF000000),
-                                  shape: BoxShape.circle,
-                                ),
+                  padding: const EdgeInsets.only(top: 10, bottom: 20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // 시간 표시 (상단으로 이동, 큰 텍스트)
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 300),
+                        style:
+                            Theme.of(context).textTheme.displayLarge?.copyWith(
+                              fontSize: 56,
+                              fontWeight: FontWeight.w300,
+                              color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
+                              letterSpacing: 2.0,
+                            ) ??
+                            const TextStyle(),
+                        child: Text(timerState.formattedTime),
+                      ),
+
+                      // 진행도 표시 (● ○ ○ ○)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(timerState.totalRounds, (index) {
+                          final isCompleted = index < timerState.currentRound;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    isCompleted
+                                        ? TimerColors.modeColors[timerState.mode] ?? Colors.grey
+                                        : (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.2),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(child: Text(selectedFarm.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500))),
-                              Text(
-                                '🍅 ${selectedFarm.tomatoCount}',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.green.shade700, fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
-                            ],
-                          )
-                          : Row(
-                            children: [
-                              Icon(Icons.grass_outlined, color: Colors.grey.shade400, size: 20),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  '농장을 선택하세요...',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                                ),
-                              ),
-                              const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
-                            ],
-                          ),
+                            ),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 5),
+                      // GIF 일러스트 영역 (부드러운 애니메이션)
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(opacity: animation, child: child);
+                        },
+                        child: _buildCharacterIllustration(timerState, key: ValueKey('${timerState.mode}_${timerState.status}')),
+                      ),
+                      const SizedBox(height: 5),
+                      // 컨트롤 버튼들
+                      _buildTimerButtons(context, ref, timerState),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-
-            // 메인 타이머 영역
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 현재 모드 표시
-                    Text(
-                      TimerTexts.modeTexts[timerState.mode] ?? '알 수 없음',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.headlineSmall?.copyWith(color: TimerColors.modeColors[timerState.mode] ?? Colors.grey, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 원형 타이머 (임시로 Container 사용)
-                    Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: TimerColors.modeColors[timerState.mode] ?? Colors.grey, width: 4),
-                        color: (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.1),
-                      ),
-                      child: Center(
-                        child: Text(
-                          timerState.formattedTime,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold, color: TimerColors.modeColors[timerState.mode] ?? Colors.grey),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 진행도 표시 (● ○ ○ ○)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(timerState.totalRounds, (index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(
-                            index < timerState.currentRound ? Icons.circle : Icons.circle_outlined,
-                            color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
-                            size: 16,
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 40),
-
-                    // 컨트롤 버튼들
-                    _buildTimerButtons(context, ref, timerState),
-                  ],
-                ),
-              ),
-            ),
             ],
           ),
         ),
@@ -178,42 +180,37 @@ class TimerScreen extends ConsumerWidget {
           // 초기 상태: 시작 버튼만 표시
           if (timerState.status == TimerStatus.initial) ...[
             _buildIconButton(
-              icon: Icons.play_arrow_outlined,
-              color: Colors.grey.shade600,
+              icon: Icons.play_arrow_rounded,
+              color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
               onPressed: () => ref.read(timerProvider.notifier).start(),
+              isPrimary: true,
             ),
           ]
           // 실행 중: 일시정지 버튼만 표시
           else if (timerState.status == TimerStatus.running) ...[
             _buildIconButton(
-              icon: Icons.pause_outlined,
-              color: Colors.grey.shade600,
+              icon: Icons.pause_rounded,
+              color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
               onPressed: () => ref.read(timerProvider.notifier).pause(),
+              isPrimary: true,
             ),
           ]
-          // 완료 상태: 빈 공간 유지
+          // 완료 상태: 자동 전환되므로 빈 공간 유지
           else if (timerState.status == TimerStatus.completed) ...[
-            // 빈 공간 유지
+            // 자동 전환을 위한 빈 공간 (0.5초 후 자동으로 다음 모드로 전환됨)
           ]
           // 일시정지 상태: 재시작, 정지, 리셋 버튼 표시
           else ...[
             _buildIconButton(
-              icon: Icons.play_arrow_outlined,
-              color: Colors.grey.shade600,
+              icon: Icons.play_arrow_rounded,
+              color: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
               onPressed: () => ref.read(timerProvider.notifier).resume(),
+              isPrimary: true,
             ),
-            const SizedBox(width: 12),
-            _buildIconButton(
-              icon: Icons.refresh_outlined,
-              color: Colors.grey.shade600,
-              onPressed: () => _showStopConfirmation(context, ref),
-            ),
-            const SizedBox(width: 12),
-            _buildIconButton(
-              icon: Icons.close_outlined,
-              color: Colors.grey.shade600,
-              onPressed: () => _showResetConfirmation(context, ref),
-            ),
+            const SizedBox(width: 16),
+            _buildIconButton(icon: Icons.refresh_rounded, color: Colors.grey.shade500, onPressed: () => _showStopConfirmation(context, ref)),
+            const SizedBox(width: 16),
+            _buildIconButton(icon: Icons.stop_rounded, color: Colors.grey.shade500, onPressed: () => _showResetConfirmation(context, ref)),
           ],
         ],
       ),
@@ -221,23 +218,20 @@ class TimerScreen extends ConsumerWidget {
   }
 
   /// 아이콘 버튼 빌드 헬퍼 메소드
-  Widget _buildIconButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return SizedBox(
-      width: 56,
-      height: 56,
+  Widget _buildIconButton({required IconData icon, required Color color, required VoidCallback onPressed, bool isPrimary = false}) {
+    return Container(
+      width: isPrimary ? 72 : 56,
+      height: isPrimary ? 72 : 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isPrimary ? color.withValues(alpha: 0.1) : Colors.transparent,
+        border: isPrimary ? Border.all(color: color.withValues(alpha: 0.2), width: 1) : null,
+      ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(
-          icon, 
-          color: color, 
-          size: 44,
-        ),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
+        icon: Icon(icon, color: color, size: isPrimary ? 36 : 28, weight: isPrimary ? 400 : 300),
+        splashColor: color.withValues(alpha: 0.1),
+        highlightColor: color.withValues(alpha: 0.05),
         hoverColor: Colors.transparent,
       ),
     );
@@ -266,6 +260,94 @@ class TimerScreen extends ConsumerWidget {
               ),
             ],
           ),
+    );
+  }
+
+  /// GIF 캐릭터 일러스트 빌드
+  Widget _buildCharacterIllustration(timerState, {Key? key}) {
+    // 상태별 GIF 표시 (완료 상태 특별 처리 제거)
+    final gifPath = TimerAssets.characterGifs[timerState.mode];
+
+    return Container(
+      key: key,
+      width: 280,
+      height: 280,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child:
+            gifPath != null
+                ? Image.asset(
+                  gifPath,
+                  width: 280,
+                  height: 280,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    // GIF 로드 실패 시 플레이스홀더 표시
+                    return _buildPlaceholderCharacter(timerState);
+                  },
+                )
+                : _buildPlaceholderCharacter(timerState),
+      ),
+    );
+  }
+
+  /// GIF 대체용 플레이스홀더 캐릭터
+  Widget _buildPlaceholderCharacter(timerState) {
+    IconData characterIcon;
+    String characterText;
+    String descriptionText;
+
+    switch (timerState.mode) {
+      case TimerMode.focus:
+        characterIcon = Icons.menu_book;
+        characterText = '🌱';
+        descriptionText = '집중 중...';
+        break;
+      case TimerMode.shortBreak:
+        characterIcon = Icons.local_cafe;
+        characterText = '☕';
+        descriptionText = '짧은 휴식';
+        break;
+      case TimerMode.longBreak:
+        characterIcon = Icons.spa;
+        characterText = '🌿';
+        descriptionText = '긴 휴식';
+        break;
+      case TimerMode.stopped:
+      default:
+        characterIcon = Icons.emoji_emotions;
+        characterText = '😊';
+        descriptionText = '준비됨';
+        break;
+    }
+
+    return Container(
+      width: 280,
+      height: 280,
+      decoration: BoxDecoration(
+        color: (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.1), width: 2),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(characterText, style: const TextStyle(fontSize: 120)),
+          const SizedBox(height: 16),
+          Text(
+            descriptionText,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.8)),
+          ),
+          const SizedBox(height: 8),
+          Icon(characterIcon, size: 32, color: (TimerColors.modeColors[timerState.mode] ?? Colors.grey).withValues(alpha: 0.4)),
+        ],
+      ),
     );
   }
 
@@ -431,12 +513,7 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
                                   margin: const EdgeInsets.only(bottom: 4),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border(
-                                      left: BorderSide(
-                                        color: _getStatusColor(task.status),
-                                        width: 3,
-                                      ),
-                                    ),
+                                    border: Border(left: BorderSide(color: _getStatusColor(task.status), width: 3)),
                                   ),
                                   child: ListTile(
                                     dense: true,
@@ -459,13 +536,9 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
                                         // 태그 표시
                                         if (task.tagIds.isNotEmpty) ...[
                                           const SizedBox(height: 2),
-                                          TaskTagsWidget(
-                                            tagIds: task.tagIds,
-                                            chipHeight: 16,
-                                            maxTags: 2,
-                                          ),
+                                          TaskTagsWidget(tagIds: task.tagIds, chipHeight: 16, maxTags: 2),
                                         ],
-                                        
+
                                         // 체크리스트 진행률 표시
                                         if (task.subTasks.isNotEmpty) ...[
                                           const SizedBox(height: 2),
@@ -475,24 +548,19 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
                                                 child: LinearProgressIndicator(
                                                   value: task.subTaskProgress,
                                                   backgroundColor: Colors.grey.shade300,
-                                                  valueColor: AlwaysStoppedAnimation(
-                                                    _getStatusColor(task.status),
-                                                  ),
+                                                  valueColor: AlwaysStoppedAnimation(_getStatusColor(task.status)),
                                                   minHeight: 2,
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
                                               Text(
                                                 '${task.completedSubTaskCount}/${task.totalSubTaskCount}',
-                                                style: const TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.grey,
-                                                ),
+                                                style: const TextStyle(fontSize: 10, color: Colors.grey),
                                               ),
                                             ],
                                           ),
                                         ],
-                                        
+
                                         // 마감일 표시
                                         if (task.dueDate != null) ...[
                                           const SizedBox(height: 2),
@@ -500,10 +568,11 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
                                             _getRelativeDateString(task.dueDate!),
                                             style: TextStyle(
                                               fontSize: 10,
-                                              color: task.isOverdue 
-                                                  ? Colors.red 
-                                                  : (task.daysUntilDue != null && task.daysUntilDue! <= 1)
-                                                      ? Colors.orange 
+                                              color:
+                                                  task.isOverdue
+                                                      ? Colors.red
+                                                      : (task.daysUntilDue != null && task.daysUntilDue! <= 1)
+                                                      ? Colors.orange
                                                       : Colors.grey,
                                             ),
                                           ),
@@ -513,47 +582,32 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
                                     trailing: PopupMenuButton<String>(
                                       icon: const Icon(Icons.more_vert, size: 16),
                                       padding: EdgeInsets.zero,
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
-                                          value: 'detail',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.info_outline, size: 16),
-                                              SizedBox(width: 8),
-                                              Text('상세보기'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'edit',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.edit, size: 16),
-                                              SizedBox(width: 8),
-                                              Text('수정'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'delete',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.delete, size: 16, color: Colors.red),
-                                              SizedBox(width: 8),
-                                              Text('삭제', style: TextStyle(color: Colors.red)),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
+                                      itemBuilder:
+                                          (context) => [
+                                            const PopupMenuItem(
+                                              value: 'detail',
+                                              child: Row(children: [Icon(Icons.info_outline, size: 16), SizedBox(width: 8), Text('상세보기')]),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Row(children: [Icon(Icons.edit, size: 16), SizedBox(width: 8), Text('수정')]),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.delete, size: 16, color: Colors.red),
+                                                  SizedBox(width: 8),
+                                                  Text('삭제', style: TextStyle(color: Colors.red)),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                       onSelected: (value) {
                                         switch (value) {
                                           case 'detail':
                                             Navigator.of(context).pop();
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (context) => TaskDetailScreen(task: task),
-                                              ),
-                                            );
+                                            Navigator.of(context).push(MaterialPageRoute(builder: (context) => TaskDetailScreen(task: task)));
                                             break;
                                           case 'edit':
                                             _showQuickEditTask(context, task);
@@ -659,9 +713,9 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final targetDate = DateTime(dueDate.year, dueDate.month, dueDate.day);
-    
+
     final difference = targetDate.difference(today).inDays;
-    
+
     if (difference == 0) {
       return '오늘';
     } else if (difference == 1) {
@@ -681,29 +735,27 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('할일 수정'),
-        content: TextField(
-          controller: taskController,
-          decoration: const InputDecoration(labelText: '할일 제목', border: OutlineInputBorder()),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
-          TextButton(
-            onPressed: () {
-              if (taskController.text.trim().isNotEmpty) {
-                ref.read(taskListProvider.notifier).updateTask(
-                  task.id,
-                  title: taskController.text.trim(),
-                );
-              }
-              Navigator.of(context).pop();
-            },
-            child: const Text('저장'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('할일 수정'),
+            content: TextField(
+              controller: taskController,
+              decoration: const InputDecoration(labelText: '할일 제목', border: OutlineInputBorder()),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
+              TextButton(
+                onPressed: () {
+                  if (taskController.text.trim().isNotEmpty) {
+                    ref.read(taskListProvider.notifier).updateTask(task.id, title: taskController.text.trim());
+                  }
+                  Navigator.of(context).pop();
+                },
+                child: const Text('저장'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -711,21 +763,22 @@ class _FarmSelectorBottomSheetState extends ConsumerState<_FarmSelectorBottomShe
   void _showDeleteConfirmation(BuildContext context, Task task) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('할일 삭제'),
-        content: Text('"${task.title}"을(를) 삭제하시겠습니까?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
-          TextButton(
-            onPressed: () {
-              ref.read(taskListProvider.notifier).deleteTask(task.id);
-              Navigator.of(context).pop();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('삭제'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('할일 삭제'),
+            content: Text('"${task.title}"을(를) 삭제하시겠습니까?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
+              TextButton(
+                onPressed: () {
+                  ref.read(taskListProvider.notifier).deleteTask(task.id);
+                  Navigator.of(context).pop();
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('삭제'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 

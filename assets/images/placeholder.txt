@@ -1,0 +1,8 @@
+이 폴더에 다음 GIF 파일들을 넣어주세요:
+
+1. focus_character.gif - 집중 모드 캐릭터 (360x360)
+2. break_character.gif - 휴식 모드 캐릭터 (360x360)  
+3. idle_character.gif - 대기 상태 캐릭터 (360x360)
+4. harvest_character.gif - 토마토 수확/완료 캐릭터 (360x360)
+
+모든 GIF는 360x360픽셀 크기로 준비해주세요.

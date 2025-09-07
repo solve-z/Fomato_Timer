@@ -110,3 +110,14 @@ class TimerColors {
     TimerMode.stopped: Color(0xFF9E9E9E), // 정지: 회색
   };
 }
+
+class TimerAssets {
+  static const Map<TimerMode, String> characterGifs = {
+    TimerMode.focus: 'assets/images/focus_character.gif',
+    TimerMode.shortBreak: 'assets/images/break_character.gif',
+    TimerMode.longBreak: 'assets/images/break_character.gif',
+    TimerMode.stopped: 'assets/images/idle_character.gif',
+  };
+  
+  static const String harvestGif = 'assets/images/harvest_character.gif';
+}
