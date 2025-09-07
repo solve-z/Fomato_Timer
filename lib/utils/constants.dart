@@ -70,40 +70,21 @@ class AppSizes {
   static const double iconSize = 24.0;
   static const double iconSizeLarge = 32.0;
 
-  static const double elevationLow = 2.0;
+  static const double elevationLow = 1.0;
+  static const double elevationVeryLow = 0.5;
   static const double elevationNone = 0.0;
 }
 
 class AppTextStyles {
-  static const TextStyle h1 = TextStyle(
-    fontSize: 32,
-    fontWeight: FontWeight.bold,
-    color: AppColors.textPrimary,
-  );
+  static const TextStyle h1 = TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary);
 
-  static const TextStyle h2 = TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
-  );
+  static const TextStyle h2 = TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textPrimary);
 
-  static const TextStyle body = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w400,
-    color: AppColors.textPrimary,
-  );
+  static const TextStyle body = TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.textPrimary);
 
-  static const TextStyle caption = TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w400,
-    color: AppColors.textSecondary,
-  );
+  static const TextStyle caption = TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary);
 
-  static const TextStyle button = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
-    color: Colors.white,
-  );
+  static const TextStyle button = TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white);
 }
 
 class AppDurations {

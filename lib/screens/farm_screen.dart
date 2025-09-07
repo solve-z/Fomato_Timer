@@ -22,7 +22,39 @@ class FarmScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('내 농장'),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 수확중/보관창고 토글 버튼
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildToggleButton(
+                    context,
+                    text: '수확중',
+                    isActive: true, // 임시로 true 설정
+                    onTap: () {
+                      // 수확중 필터 로직
+                    },
+                  ),
+                  _buildToggleButton(
+                    context,
+                    text: '보관창고',
+                    isActive: false, // 임시로 false 설정
+                    onTap: () {
+                      // 보관창고 필터 로직
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -90,12 +122,11 @@ class FarmScreen extends ConsumerWidget {
         
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          elevation: isSelected ? 3 : 1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: isSelected 
                 ? BorderSide(color: Color(int.parse(farm.color.substring(1), radix: 16) + 0xFF000000), width: 2)
-                : BorderSide.none,
+                : BorderSide(color: Colors.grey.shade300, width: 1),
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -427,6 +458,32 @@ class FarmScreen extends ConsumerWidget {
             child: const Text('삭제', style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 토글 버튼 빌드 헬퍼 메소드
+  Widget _buildToggleButton(BuildContext context, {
+    required String text,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? Theme.of(context).primaryColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
       ),
     );
   }

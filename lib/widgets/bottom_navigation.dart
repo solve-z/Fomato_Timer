@@ -32,28 +32,20 @@ class _MainBottomNavigationState extends State<MainBottomNavigation> {
   // 각 탭의 네비게이션 정보
   final List<BottomNavigationBarItem> _navItems = [
     const BottomNavigationBarItem(
-      icon: Icon(Icons.timer),
-      activeIcon: Icon(Icons.timer),
-      label: '타이머',
-      tooltip: '뽀모도로 타이머',
+      icon: Icon(Icons.timer, size: 28),
+      label: '',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.grass),
-      activeIcon: Icon(Icons.grass),
-      label: '농장',
-      tooltip: '내 농장 관리',
+      icon: Icon(Icons.grass, size: 28),
+      label: '',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.bar_chart),
-      activeIcon: Icon(Icons.bar_chart),
-      label: '통계',
-      tooltip: '수확 통계',
+      icon: Icon(Icons.bar_chart, size: 28),
+      label: '',
     ),
     const BottomNavigationBarItem(
-      icon: Icon(Icons.settings),
-      activeIcon: Icon(Icons.settings),
-      label: '설정',
-      tooltip: '앱 설정',
+      icon: Icon(Icons.settings, size: 28),
+      label: '',
     ),
   ];
 
@@ -71,10 +63,12 @@ class _MainBottomNavigationState extends State<MainBottomNavigation> {
         items: _navItems,
         selectedItemColor: Theme.of(context).primaryColor,
         unselectedItemColor: Colors.grey.shade600,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        elevation: 8,
+        selectedFontSize: 0,
+        unselectedFontSize: 0,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
         backgroundColor: Colors.white,
+        enableFeedback: false,
       ),
     );
   }

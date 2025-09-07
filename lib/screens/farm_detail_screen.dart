@@ -71,7 +71,6 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
             width: double.infinity,
             margin: const EdgeInsets.all(16),
             child: Card(
-              elevation: 2,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(

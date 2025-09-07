@@ -76,9 +76,10 @@ class AppTheme {
       
       cardTheme: CardTheme(
         color: AppColors.background,
-        elevation: AppSizes.elevationLow,
+        elevation: AppSizes.elevationNone,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.cardBorderRadius),
+          side: const BorderSide(color: AppColors.border, width: 1),
         ),
         margin: const EdgeInsets.all(AppSizes.paddingSmall),
       ),
@@ -112,7 +113,7 @@ class AppTheme {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.disabled,
         type: BottomNavigationBarType.fixed,
-        elevation: AppSizes.elevationLow,
+        elevation: AppSizes.elevationNone,
         selectedLabelStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -122,6 +123,9 @@ class AppTheme {
           fontWeight: FontWeight.w400,
         ),
       ),
+      
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
       
       iconTheme: const IconThemeData(
         color: AppColors.textPrimary,

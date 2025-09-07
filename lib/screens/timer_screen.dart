@@ -25,25 +25,14 @@ class TimerScreen extends ConsumerWidget {
     final selectedFarm = ref.watch(selectedFarmProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Fomato Timer'),
-        centerTitle: true,
-        actions: [
-          // 설정 버튼 (나중에 사용)
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // 설정 화면으로 이동 (추후 구현)
-            },
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // 농장 선택 영역
-            GestureDetector(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              // 농장 선택 영역
+              GestureDetector(
               onTap: () => _showFarmSelector(context, ref),
               child: Card(
                 child: Padding(
@@ -145,7 +134,8 @@ class TimerScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -178,100 +168,78 @@ class TimerScreen extends ConsumerWidget {
 
   /// 타이머 상태에 따른 버튼들 빌드
   Widget _buildTimerButtons(BuildContext context, WidgetRef ref, timerState) {
-    // 초기 상태: 시작 버튼만 표시
-    if (timerState.status == TimerStatus.initial) {
-      return Row(
+    // 고정된 높이의 컨테이너로 UI 높이 일정하게 유지
+    return SizedBox(
+      height: 56,
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          ElevatedButton.icon(
-            onPressed: () => ref.read(timerProvider.notifier).start(),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('시작'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          // 초기 상태: 시작 버튼만 표시
+          if (timerState.status == TimerStatus.initial) ...[
+            _buildIconButton(
+              icon: Icons.play_arrow_outlined,
+              color: Colors.grey.shade600,
+              onPressed: () => ref.read(timerProvider.notifier).start(),
             ),
-          ),
-        ],
-      );
-    }
-    // 실행 중: 일시정지 버튼만 표시
-    else if (timerState.status == TimerStatus.running) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ElevatedButton.icon(
-            onPressed: () => ref.read(timerProvider.notifier).pause(),
-            icon: const Icon(Icons.pause),
-            label: const Text('일시정지'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade500,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ]
+          // 실행 중: 일시정지 버튼만 표시
+          else if (timerState.status == TimerStatus.running) ...[
+            _buildIconButton(
+              icon: Icons.pause_outlined,
+              color: Colors.grey.shade600,
+              onPressed: () => ref.read(timerProvider.notifier).pause(),
             ),
-          ),
+          ]
+          // 완료 상태: 빈 공간 유지
+          else if (timerState.status == TimerStatus.completed) ...[
+            // 빈 공간 유지
+          ]
+          // 일시정지 상태: 재시작, 정지, 리셋 버튼 표시
+          else ...[
+            _buildIconButton(
+              icon: Icons.play_arrow_outlined,
+              color: Colors.grey.shade600,
+              onPressed: () => ref.read(timerProvider.notifier).resume(),
+            ),
+            const SizedBox(width: 12),
+            _buildIconButton(
+              icon: Icons.refresh_outlined,
+              color: Colors.grey.shade600,
+              onPressed: () => _showStopConfirmation(context, ref),
+            ),
+            const SizedBox(width: 12),
+            _buildIconButton(
+              icon: Icons.close_outlined,
+              color: Colors.grey.shade600,
+              onPressed: () => _showResetConfirmation(context, ref),
+            ),
+          ],
         ],
-      );
-    }
-    // 완료 상태: 버튼 크기만큼 공간 유지 (UI 위치 변화 방지)
-    else if (timerState.status == TimerStatus.completed) {
-      return const SizedBox(
-        height: 48, // 버튼 높이만큼 공간 유지
-      );
-    }
-    // 일시정지 상태: 재시작, 정지, 리셋 버튼 표시
-    else {
-      return Column(
-        children: [
-          // 첫 번째 행: 재시작 버튼
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () => ref.read(timerProvider.notifier).resume(),
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('재시작'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: TimerColors.modeColors[timerState.mode] ?? Colors.grey,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // 두 번째 행: 정지, 리셋 버튼
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _showStopConfirmation(context, ref),
-                icon: const Icon(Icons.stop),
-                label: const Text('정지'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade600,
-                  side: BorderSide(color: Colors.red.shade600),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _showResetConfirmation(context, ref),
-                icon: const Icon(Icons.refresh),
-                label: const Text('리셋'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.grey.shade600,
-                  side: BorderSide(color: Colors.grey.shade600),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-    }
+      ),
+    );
+  }
+
+  /// 아이콘 버튼 빌드 헬퍼 메소드
+  Widget _buildIconButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(
+          icon, 
+          color: color, 
+          size: 44,
+        ),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+      ),
+    );
   }
 
   /// 정지 확인 다이얼로그
